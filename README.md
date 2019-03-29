@@ -105,5 +105,5 @@ freq = float(scope.visa_ask(':MEASure:COUNter:VALue?'))
 An full implementation of a manual frequency sweep bode plot measurement is available in the _examples_ folder.
 
 
-##Acknowledgements
+## Acknowledgements
 Based on the original work by @jtambasco. I have done a code cleanup, a couple of bug fixes and a complete rewrite of the backend, now with a PyVISA dependency in order to make this library cross-platform. Also improved documentation and added examples.
