@@ -1,5 +1,5 @@
 import visa
-import Rigol1000z
+import rigol1000z
 from tqdm import tqdm
 import numpy as np
 import keyboard

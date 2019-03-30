@@ -1,7 +1,7 @@
 import os
-import numpy as np
-import tqdm
-import visa
+import numpy as _np
+import tqdm as _tqdm
+import visa as _visa
 
 class _Rigol1000zChannel:
     '''
@@ -144,7 +144,7 @@ class _Rigol1000zChannel:
         last_block_pts = info['points'] % max_num_pts
 
         datas = []
-        for i in tqdm.tqdm(range(num_blocks+1), ncols=60):
+        for i in _tqdm.tqdm(range(num_blocks+1), ncols=60):
             if i < num_blocks:
                 self._osc.visa_write(':wav:star %i' % (1+i*250000))
                 self._osc.visa_write(':wav:stop %i' % (250000*(i+1)))
@@ -155,13 +155,13 @@ class _Rigol1000zChannel:
                 else:
                     break
             data = self._osc.visa_ask_raw(':wav:data?')[11:]
-            data = np.frombuffer(data, 'B')
+            data = _np.frombuffer(data, 'B')
             datas.append(data)
 
-        datas = np.concatenate(datas)
+        datas = _np.concatenate(datas)
         v = (datas - info['yorigin'] - info['yreference']) * info['yincrement']
 
-        t = np.arange(0, info['points']*info['xincrement'], info['xincrement'])
+        t = _np.arange(0, info['points']*info['xincrement'], info['xincrement'])
         # info['xorigin'] + info['xreference']
 
         if filename:
@@ -169,7 +169,7 @@ class _Rigol1000zChannel:
                 os.remove(filename)
             except OSError:
                 pass
-            np.savetxt(filename, np.c_[t, v], '%.12e', ',')
+            _np.savetxt(filename, _np.c_[t, v], '%.12e', ',')
 
         return t, v
 
