@@ -1,16 +1,21 @@
 import os
 import numpy as _np
 import tqdm as _tqdm
-import visa as _visa
+import pyvisa as _visa
+
 
 class _Rigol1000zChannel:
-    '''
+    """
     Handles the channels configuration (vertical axis).
-    '''
+    """
 
     def __init__(self, channel, osc):
         self._channel = channel
         self._osc = osc
+
+    @property
+    def channel(self):
+        return self._channel
 
     def visa_write(self, cmd):
         return self._osc.visa_write(':chan%i%s' % (self._channel, cmd))
@@ -23,7 +28,7 @@ class _Rigol1000zChannel:
         r = self.visa_read()
         return r
 
-    def get_voltage_rms_V(self):
+    def get_voltage_rms_v(self):
         assert 1 <= self._channel <= 4, 'Invalid channel.'
         return self._osc.ask(':MEAS:ITEM? VRMS,CHAN%i' % self._channel)
 
@@ -54,23 +59,23 @@ class _Rigol1000zChannel:
     def disabled(self):
         return bool(int(self.visa_ask(':disp?'))) ^ 1
 
-    def get_offset_V(self):
+    def get_offset_v(self):
         return float(self.visa_ask(':off?'))
 
-    def set_offset_V(self, offset):
+    def set_offset_v(self, offset):
         assert -1000 <= offset <= 1000.
         self.visa_write(':off %.4e' % offset)
-        return self.get_offset_V()
+        return self.get_offset_v()
 
-    def get_range_V(self):
+    def get_range_v(self):
         return self.visa_ask(':rang?')
 
-    def set_range_V(self, range):
+    def set_range_v(self, range):
         assert 8e-3 <= range <= 800.
         self.visa_write(':rang %.4e' % range)
-        return self.get_range_V()
+        return self.get_range_v()
 
-    def set_vertical_scale_V(self, scale):
+    def set_vertical_scale_v(self, scale):
         assert 1e-3 <= scale <= 100
         self.visa_write(':scal %.4e' % scale)
 
@@ -78,7 +83,7 @@ class _Rigol1000zChannel:
         return float(self.visa_ask(':prob?'))
 
     def set_probe_ratio(self, ratio):
-        assert ratio in (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1,\
+        assert ratio in (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, \
                          2, 5, 10, 20, 50, 100, 200, 500, 1000)
         self.visa_write(':prob %s' % ratio)
         return self.get_probe_ratio()
@@ -92,12 +97,12 @@ class _Rigol1000zChannel:
         self.visa_write(':unit %s' % unit)
 
     def get_data_premable(self):
-        '''
+        """
         Get information about oscilloscope axes.
 
         Returns:
             dict: A dictionary containing general oscilloscope axes information.
-        '''
+        """
         pre = self._osc.visa_ask(':wav:pre?').split(',')
         pre_dict = {
             'format': int(pre[0]),
@@ -114,7 +119,7 @@ class _Rigol1000zChannel:
         return pre_dict
 
     def get_data(self, mode='norm', filename=None):
-        '''
+        """
         Download the captured voltage points from the oscilloscope.
 
         Args:
@@ -128,7 +133,7 @@ class _Rigol1000zChannel:
             2-tuple: A tuple of two lists.  The first list is the time values
                 and the second list is the voltage values.
 
-        '''
+        """
         assert mode in ('norm', 'raw')
 
         # Setup scope
@@ -139,44 +144,57 @@ class _Rigol1000zChannel:
 
         info = self.get_data_premable()
 
+        print(f"info {info}")
+
         max_num_pts = 250000
         num_blocks = info['points'] // max_num_pts
         last_block_pts = info['points'] % max_num_pts
 
         datas = []
-        for i in _tqdm.tqdm(range(num_blocks+1), ncols=60):
+        for i in _tqdm.tqdm(range(num_blocks + 1), ncols=60):
             if i < num_blocks:
-                self._osc.visa_write(':wav:star %i' % (1+i*250000))
-                self._osc.visa_write(':wav:stop %i' % (250000*(i+1)))
+                self._osc.visa_write(':wav:star %i' % (1 + i * 250000))
+                self._osc.visa_write(':wav:stop %i' % (250000 * (i + 1)))
             else:
                 if last_block_pts:
-                    self._osc.visa_write(':wav:star %i' % (1+num_blocks*250000))
-                    self._osc.visa_write(':wav:stop %i' % (num_blocks*250000+last_block_pts))
+                    self._osc.visa_write(':wav:star %i' % (1 + num_blocks * 250000))
+                    self._osc.visa_write(':wav:stop %i' % (num_blocks * 250000 + last_block_pts))
                 else:
                     break
-            data = self._osc.visa_ask_raw(':wav:data?')[11:]
-            data = _np.frombuffer(data, 'B')
+            data = self._osc.visa_ask_raw(':wav:data?', 250000)
+
+            # with open("data_resp_view_raw.csv", "wb") as f:
+            #    print("writing")
+            #    f.write(data)
+
+            # Get the response length from the header data
+            data_response_len_bytes = int("".join(chr(c) for c in data[2:11]))
+            # print(f"header resp length={data_response_len_bytes}")
+
+            data = _np.frombuffer(data[12:], 'B')
             datas.append(data)
 
         datas = _np.concatenate(datas)
         v = (datas - info['yorigin'] - info['yreference']) * info['yincrement']
 
-        t = _np.arange(0, info['points']*info['xincrement'], info['xincrement'])
+        t = _np.arange(0, (info['points']) * info['xincrement'], info['xincrement'])
         # info['xorigin'] + info['xreference']
 
         if filename:
+            print(filename)
             try:
                 os.remove(filename)
             except OSError:
                 pass
-            _np.savetxt(filename, _np.c_[t, v], '%.12e', ',')
+            _np.savetxt(filename, _np.c_[t, v], '%.12e', ', ', '\n')
 
         return t, v
 
+
 class _Rigol1000zTrigger:
-    '''
+    """
     Handles the trigger configuration.
-    '''
+    """
 
     def __init__(self, osc):
         self._osc = osc
@@ -195,10 +213,11 @@ class _Rigol1000zTrigger:
         self._osc.visa_write(':trig:hold %.3e' % holdoff)
         return self.get_trigger_holdoff_s()
 
+
 class _Rigol1000zTimebase:
-    '''
+    """
     Handles the timebase configuration (horizontal axis).
-    '''
+    """
 
     def __init__(self, osc):
         self._osc = osc
@@ -238,8 +257,9 @@ class _Rigol1000zTimebase:
         self.visa_write(':offs %.4e' % -offset)
         return self.get_timebase_offset_s()
 
+
 class Rigol1000z:
-    '''
+    """
     Rigol DS1000z series oscilloscope driver.
 
     Channels 1 through 4 (or 2 depending on the oscilloscope model) are accessed
@@ -251,21 +271,34 @@ class Rigol1000z:
             related to the oscilloscope trigger.
         timebase (`_Rigol1000zTimebase`): Timebase object containing functions
             related to the oscilloscope timebase.
-    '''
+    """
 
     def __init__(self, visa_resource):
-        self.visa_resource = visa_resource
+        self.visa_resource: _visa.Resource = visa_resource
 
-        self._channels = [_Rigol1000zChannel(c, self) for c in range(1,5)]
+        self._channels = [_Rigol1000zChannel(c, self) for c in range(1, 5)]
         self.trigger = _Rigol1000zTrigger(self)
         self.timebase = _Rigol1000zTimebase(self)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.visa_resource.close()
+        return False
+
+    def __del__(self):
+        self.visa_resource.close()
+
     def __getitem__(self, i):
+        # assert i in {c.channel for c in self._channels}
         assert 1 <= i <= 4, 'Not a valid channel.'
-        return self._channels[i-1]
+        return self._channels[i - 1]
 
     def __len__(self):
         return len(self._channels)
+
+    # region resourceIO
 
     def visa_write(self, cmd):
         self.visa_resource.write(cmd)
@@ -282,6 +315,8 @@ class Rigol1000z:
     def visa_ask_raw(self, cmd, num_bytes=-1):
         self.visa_write(cmd)
         return self.visa_read_raw(num_bytes)
+
+    # endregion
 
     def autoscale(self):
         self.visa_write(':aut')
@@ -308,7 +343,7 @@ class Rigol1000z:
         return self.visa_ask(':acq:aver?')
 
     def set_averaging(self, count):
-        assert count in [2**n for n in range(1, 11)]
+        assert count in [2 ** n for n in range(1, 11)]
         self.visa_write(':acq:aver %i' % count)
         return self.get_averaging()
 
@@ -347,7 +382,7 @@ class Rigol1000z:
 
     def set_memory_depth(self, pts):
         num_enabled_chans = sum(self.get_channels_enabled())
-        
+
         pts = int(pts) if pts != 'AUTO' else pts
 
         if num_enabled_chans == 1:
@@ -359,35 +394,35 @@ class Rigol1000z:
 
         self.run()
         self.visa_write(':acq:mdep %s' % pts)
-        
+
     def get_channels_enabled(self):
         return [c.enabled() for c in self._channels]
 
     def selected_channel(self):
         return self.visa_ask(':MEAS:SOUR?')
 
-    def get_screenshot(self, filename = None, format='png'):
-        '''
+    def get_screenshot(self, filename=None, img_format='png'):
+        """
         Downloads a screenshot from the oscilloscope.
 
         Args:
             filename (str): The name of the image file.  The appropriate
                 extension should be included (i.e. jpg, png, bmp or tif).
-            type (str): The format image that should be downloaded.  Options
+            img_format (str): The format image that should be downloaded.  Options
                 are 'jpeg, 'png', 'bmp8', 'bmp24' and 'tiff'.  It appears that
                 'jpeg' takes <3sec to download while all the other formats take
                 <0.5sec.  Default is 'png'.
-        '''
+        """
 
-        assert format in ('jpeg', 'png', 'bmp8', 'bmp24', 'tiff')
+        assert img_format in ('jpeg', 'png', 'bmp8', 'bmp24', 'tiff')
 
-        #Due to the up to 3s delay, we are setting timeout to None for this operation only
-        oldTimeout = self.visa_resource.timeout
+        # Due to the up to 3s delay, we are setting timeout to None for this operation only
+        old_timeout = self.visa_resource.timeout
         self.visa_resource.timeout = None
 
-        raw_img = self.visa_ask_raw(':disp:data? on,off,%s' % format, 3850780)[11:-4]
+        raw_img = self.visa_ask_raw(':disp:data? on,off,%s' % img_format, 3850780)[11:-4]
 
-        self.visa_resource.timeout = oldTimeout
+        self.visa_resource.timeout = old_timeout
 
         if filename:
             try:
