@@ -1,3 +1,21 @@
+class EAcquireModes:
+    Normal = "NORM"
+    Averages = "AVER"
+    Peak = "PEAK"
+    HighResolution = "HRES"
+
+
+class EDisplayModes:
+    Vectors = "VEC"
+    Dots = "DOTS"
+
+
+class EDisplayGrid:
+    Full = "FULL"
+    Half = "HALF"
+    NoGrid = "NONE"
+
+
 class ESource:
     D0 = "D0"
     D1 = "D1"

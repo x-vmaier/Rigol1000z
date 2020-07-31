@@ -14,9 +14,12 @@ class Rigol1000z(CommandMenu):
     def __init__(self, visa_resource: _visa.Resource):
         super().__init__(visa_resource)
 
-        self.acquire = Acquire(self.visa_resource)
-        self.calibrate = Calibrate(self.visa_resource)
         self.channels = [Channel(self.visa_resource, c) for c in range(1, 5)]
+
+        # acquire must count enabled channels
+        self.acquire = Acquire(self.visa_resource, self.channels)
+        self.calibrate = Calibrate(self.visa_resource)
+
         self.cursor = Cursor(self.visa_resource)
         self.decoder = Decoder(self.visa_resource)
         self.display = Display(self.visa_resource)
@@ -91,6 +94,7 @@ class Rigol1000z(CommandMenu):
     def get_channels_enabled(self):
         return [c.enabled() for c in self.channels]
 
+    # todo: make this more closely knit with the library
     def get_screenshot(self, filename=None, img_format='png'):
         """
         Downloads a screenshot from the oscilloscope.

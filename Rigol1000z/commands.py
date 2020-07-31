@@ -4,102 +4,7 @@ import tqdm as _tqdm
 import pyvisa as _visa
 from Rigol1000z.commandmenu import CommandMenu
 from Rigol1000z.constants import *
-
-
-# incomplete
-class Acquire(CommandMenu):
-    cmd_hierarchy_str = ":acq"
-
-    @property
-    def averages(self):
-        """
-        Query the number of averages under the average acquisition mode.
-        2^n (n is an integer from 1 to 10)
-        :return: an integer between 2 and 1024.
-        """
-        return int(self.visa_ask(':aver?'))
-
-    @averages.setter
-    def averages(self, val):
-        """
-        Set the number of averages under the average acquisition mode.
-
-        :param val:
-        :return:
-        """
-        assert val in [2 ** n for n in range(1, 11)]
-        self.visa_write(f':aver {int(val)}')
-
-    @property
-    def memory_depth(self):
-        """
-        Query the memory depth of the oscilloscope (namely the number of waveform
-        points that can be stored in a single trigger sample). The default unit is pts (points).
-
-        :return:
-        """
-        md = self.visa_ask(':mdep?')
-        return int(md) if md != 'AUTO' else md
-
-    # todo: requires access to channels
-    @memory_depth.setter
-    def set_memory_depth(self, pts):
-        num_enabled_chans = sum(self.get_channels_enabled())
-
-        pts = int(pts) if pts != 'AUTO' else pts
-
-        if num_enabled_chans == 1:
-            assert pts in ('AUTO', 12000, 120000, 1200000, 12000000, 24000000)
-        elif num_enabled_chans == 2:
-            assert pts in ('AUTO', 6000, 60000, 600000, 6000000, 12000000)
-        elif num_enabled_chans in (3, 4):
-            assert pts in ('AUTO', 3000, 30000, 300000, 3000000, 6000000)
-
-        self.run()
-        self.visa_write(f':mdep {pts}')
-
-    # todo: consolidate into enum set/read
-    # region acquire mode
-    def set_averaging_mode(self):
-        self.visa_write(':type aver')
-        return self.get_mode()
-
-    def set_normal_mode(self):
-        self.visa_write(':type norm')
-        return self.get_mode()
-
-    def set_high_resolution_mode(self):
-        self.visa_write(':type hres')
-        return self.get_mode()
-
-    def set_peak_mode(self):
-        self.visa_write(':type peak')
-        return self.get_mode()
-
-    def get_mode(self):
-        modes = {
-            'NORM': 'normal',
-            'AVER': 'averages',
-            'PEAK': 'peak',
-            'HRES': 'high_resolution'
-        }
-        return modes[self.visa_ask(':type?')]
-
-    # endregion
-
-    def get_sampling_rate(self):
-        return float(self.visa_ask(':srat?'))
-
-
-class Calibrate(CommandMenu):
-    """
-    Complete
-    """
-
-    cmd_hierarchy_str = ":cal"
-
-    def set_auto_calibration(self, state: bool = True):
-        self.visa_write(f":{'star' if state else 'quit'}")
+from typing import List, Union
 
 
 class Channel(CommandMenu):
@@ -248,6 +153,112 @@ class Channel(CommandMenu):
 
 
 # incomplete
+class Acquire(CommandMenu):
+    cmd_hierarchy_str = ":acq"
+
+    def __init__(self, visa_resource: _visa.Resource, channels: List[Channel]):
+        super().__init__(visa_resource)
+        self._linked_channels = channels
+
+    @property
+    def averages(self):
+        """
+        Query the number of averages under the average acquisition mode.
+        2^n (n is an integer from 1 to 10)
+        :return: an integer between 2 and 1024.
+        """
+        return int(self.visa_ask(':aver?'))
+
+    @averages.setter
+    def averages(self, val):
+        """
+        Set the number of averages under the average acquisition mode.
+
+        :param val:
+        :return:
+        """
+        assert val in [2 ** n for n in range(1, 11)]
+        self.visa_write(f':aver {int(val)}')
+
+    @property
+    def memory_depth(self) -> int:
+        """
+        Query the memory depth of the oscilloscope (namely the number of waveform
+        points that can be stored in a single trigger sample). The default unit is pts (points).
+
+        Auto mode is indicated with a -1 returned
+
+        :return:
+        """
+        md = self.visa_ask(':mdep?')
+        return int(md) if md != 'AUTO' else -1
+
+    # todo: requires access to channels
+    @memory_depth.setter
+    def memory_depth(self, val: int):
+        """
+        #todo: figure out if this command requires a run command before memory depth can be written
+
+        Auto mode is indicated with a -1
+
+        :param val: The number of points to acquire
+        :return:
+        """
+
+        num_enabled_chans = sum(1 if c.enabled else 0 for c in self._linked_channels)
+
+        val = int(val) if val != -1 else 'AUTO'
+
+        if num_enabled_chans == 1:
+            assert val in ('AUTO', 12000, 120000, 1200000, 12000000, 24000000)
+        elif num_enabled_chans == 2:
+            assert val in ('AUTO', 6000, 60000, 600000, 6000000, 12000000)
+        elif num_enabled_chans in (3, 4):
+            assert val in ('AUTO', 3000, 30000, 300000, 3000000, 6000000)
+
+        # todo: set to run mode perhaps
+        self.visa_write(f':mdep {val}')
+
+    @property
+    def mode(self):
+        return self.visa_ask(':type?')
+
+    @mode.setter
+    def mode(self, val: str):
+        assert val in {EAcquireModes.Normal, EAcquireModes.Averages, EAcquireModes.HighResolution, EAcquireModes.Peak}
+        self.visa_write(f':type {val}')
+
+    @property
+    def sampling_rate(self):
+        """
+        Sample rate is the sample frequency of the oscilloscope, namely the waveform points sampled per second.
+
+        The following equation describes the relationship among memory depth, sample rate, and waveform length:
+            Memory Depth = Sample Rate x Waveform Length
+
+        Wherein:
+            Memory Depth can be set using the :ACQuire:MDEPth command
+            Waveform Length is the product of:
+                The horizontal timebase (set by the :TIMebase[:MAIN]:SCALe command)
+                The number of the horizontal scales (12 for DS1000Z).
+
+        :return: A float with units Sa/s
+        """
+        return float(self.visa_ask(':srat?'))
+
+
+class Calibrate(CommandMenu):
+    """
+    Complete
+    """
+
+    cmd_hierarchy_str = ":cal"
+
+    def set_auto_calibration(self, state: bool = True):
+        self.visa_write(f":{'star' if state else 'quit'}")
+
+
+# incomplete
 class Cursor(CommandMenu):
     cmd_hierarchy_str = ":curs"
 
@@ -260,6 +271,76 @@ class Decoder(CommandMenu):
 # incomplete
 class Display(CommandMenu):
     cmd_hierarchy_str = ":disp"
+
+    def clear(self):
+        return self.visa_write(':cle')
+
+    # def data
+    # this is currently implemented in the primary Rigol1000z class
+
+    @property
+    def mode(self):
+        return self.visa_ask(':type?')
+
+    @mode.setter
+    def mode(self, val: str):
+        assert val in {EDisplayModes.Vectors, EDisplayModes.Dots}
+        self.visa_write(f':type {val}')
+
+    @property
+    def persistence_time(self):
+        return self.visa_ask(':grad:time?')
+
+    @persistence_time.setter
+    def persistence_time(self, val: Union[float, str]):
+        """
+         MIN: set the persistence time to its minimum to view the waveform changing in high refresh rate.
+
+         Specific Values: set the persistence time to one of the values listed above to observe
+        glitch that changes relatively slowly or glitch with low occurrence probability.
+
+         INFinite: in this mode, the oscilloscope displays the newly acquired waveform
+        without clearing the waveform formerly acquired. It can be used to measure noise
+        and jitter as well as capture incidental events.
+
+        :param val:
+        :return:
+        """
+        assert val in {"MIN", 0.1, 0.2, 0.5, 1, 5, 10, "INF"}
+        self.visa_write(f':grad:time {val}')
+
+    @property
+    def brightness(self):
+        """
+        Query the screen brightness
+
+        :return: A float between 0 and 1
+        """
+        return float(self.visa_ask(':WBR?') / 100.0)
+
+    @brightness.setter
+    def brightness(self, val: float):
+        """
+        Set the screen brightness
+
+        :param val: A float between 0 and 1
+        :return:
+        """
+        assert 0.0 <= val <= 1.0
+        self.visa_write(f':WBR {int(val * 100)}')
+
+    @property
+    def grid(self):
+        """
+        Set or query the grid type of screen display
+        :return:
+        """
+        return self.visa_ask(':GRID?')
+
+    @grid.setter
+    def grid(self, val: float):
+        assert val in {EDisplayGrid.Full, EDisplayGrid.Half, EDisplayGrid.NoGrid}
+        self.visa_write(f':GRID {val}')
 
 
 # incomplete
@@ -532,6 +613,10 @@ class Trigger(CommandMenu):
 
 
 class PreambleContext:
+    """
+    Proper storage class for preamble data
+    """
+
     def __init__(self, preamble_str):
         pre = preamble_str.split(',')
 
@@ -547,8 +632,10 @@ class PreambleContext:
         self.y_reference: float = float(pre[9])
 
 
-# incomplete
 class Waveform(CommandMenu):
+    """
+    Complete
+    """
     cmd_hierarchy_str = ":wav"
 
     @property
@@ -731,3 +818,5 @@ class Waveform(CommandMenu):
         raw_pre = self.visa_ask(':pre?')
         return PreambleContext(raw_pre)
 
+    # todo: review get is data handled directly from the Rigol class.
+    #  Make sure this makes sense because this violates the pattern taken by the rest of the menus
