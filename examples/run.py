@@ -1,7 +1,7 @@
 import pyvisa as visa
 import Rigol1000z
 from time import sleep
-
+from Rigol1000z.constants import EWaveformMode
 rm = visa.ResourceManager()
 
 # We are connecting the oscilloscope through USB here.
@@ -16,7 +16,9 @@ with Rigol1000z.Rigol1000z(osc_resource) as osc:
     print(type(osc[1]))
 
     # Change voltage range of channel 1 to 50mV/div.
-    osc[1].set_vertical_scale_v(50e-3)
+    # osc[1].set_vertical_scale_v(50e-3)
+    osc.autoscale()
+    sleep(4.0)
 
     osc.run()
     sleep(0.5)
@@ -32,6 +34,6 @@ with Rigol1000z.Rigol1000z(osc_resource) as osc:
     # for c in range(1, 4):
 
     # osc[c].get_data('raw', 'channel%i.dat' % c)
-    osc[1].get_data('raw', './channel1.csv')
+    osc.get_data(EWaveformMode.Raw, './channel1.csv')
 
 print("done")
