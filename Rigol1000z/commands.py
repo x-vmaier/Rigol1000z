@@ -115,11 +115,11 @@ class Channel(CommandMenu):
         self.visa_write(f':tcal {val:.4e}')
 
     @property
-    def scale_v(self):
+    def scale_v(self) -> float:
         return float(self.visa_ask(':scal?'))
 
     @scale_v.setter
-    def scale_v(self, val):
+    def scale_v(self, val: float):
         probe_ratio = self.probe_ratio
         assert 1e-3 * probe_ratio <= val <= 10. * probe_ratio
         self.visa_write(f':scal {val:.4e}')
@@ -152,8 +152,10 @@ class Channel(CommandMenu):
         self.visa_write(f':vern {int(val is True)}')
 
 
-# incomplete
 class Acquire(CommandMenu):
+    """
+    Complete
+    """
     cmd_hierarchy_str = ":acq"
 
     def __init__(self, visa_resource: _visa.Resource, channels: List[Channel]):
@@ -216,7 +218,7 @@ class Acquire(CommandMenu):
         elif num_enabled_chans in (3, 4):
             assert val in ('AUTO', 3000, 30000, 300000, 3000000, 6000000)
 
-        # todo: set to run mode perhaps
+        # todo: set to run mode if required
         self.visa_write(f':mdep {val}')
 
     @property
@@ -268,8 +270,10 @@ class Decoder(CommandMenu):
     cmd_hierarchy_str = ":dec"
 
 
-# incomplete
 class Display(CommandMenu):
+    """
+    Complete
+    """
     cmd_hierarchy_str = ":disp"
 
     def clear(self):
@@ -342,10 +346,153 @@ class Display(CommandMenu):
         assert val in {EDisplayGrid.Full, EDisplayGrid.Half, EDisplayGrid.NoGrid}
         self.visa_write(f':GRID {val}')
 
+    @property
+    def grid_brightness(self):
+        """
+        Query the grid brightness
 
-# incomplete
-class Etable(CommandMenu):
-    cmd_hierarchy_str = ":etabl"
+        :return: A float between 0 and 1
+        """
+        return float(self.visa_ask(':GBR?') / 100.0)
+
+    @grid_brightness.setter
+    def grid_brightness(self, val: float):
+        """
+        Set the grid brightness
+
+        :param val: A float between 0 and 1
+        :return:
+        """
+        assert 0.0 <= val <= 1.0
+        self.visa_write(f':GBR {int(val * 100)}')
+
+
+class EventTable(CommandMenu):
+    """
+    Complete
+    """
+
+    def __init__(self, visa_resource: _visa.Resource, etable_num: int):
+        super().__init__(visa_resource)
+        assert 1 <= etable_num <= 2
+        self._etable_num = etable_num
+
+        self.cmd_hierarchy_str = f":etab{self._etable_num}"
+
+    @property
+    def enabled(self) -> bool:
+        """
+        Query the status of the decoding event table.
+        :return: Boolean state of the event table
+        """
+        # todo: query decoder<n>:display to ensure command is valid
+        return bool(self.visa_ask(':disp?'))
+
+    @enabled.setter
+    def enabled(self, val: bool):
+        """
+        Turn on or off the decoding event table.
+        :param val: Boolean state to set the event table to
+        :return:
+        """
+        # todo: query decoder<n>:display to ensure command is valid
+        self.visa_write(f':disp {1 if val else 0}')
+
+    @property
+    def display_format(self) -> str:
+        # todo: query decoder<n>:display to ensure command is valid
+        return bool(self.visa_ask(':form?'))
+
+    @display_format.setter
+    def display_format(self, val: str):
+        # todo: query decoder<n>:display to ensure command is valid
+        assert val in {EEventtableFormat.Hex, EEventtableFormat.Ascii, EEventtableFormat.Decimal}
+        self.visa_write(f':form {val}')
+
+    @property
+    def view(self) -> str:
+        return self.visa_ask(':view?')
+
+    @view.setter
+    def view(self, val: str):
+        assert val in {EEventtableViewFormat.Package, EEventtableViewFormat.Detail, EEventtableViewFormat.Payload}
+        self.visa_write(f':view {val}')
+
+    @property
+    def column(self) -> str:
+        """
+        Query the current column of the event table.
+        :return:
+        """
+        return self.visa_ask(':col?')
+
+    @column.setter
+    def column(self, val: str):
+        """
+        Set the current column of the event table.
+
+         When different decoder is selected (:DECoder<n>:MODE), the range of <col>
+        differs.
+
+        Parallel decoding: DATA
+        RS232 decoding: TX|RX
+        I2C decoding: DATA
+        SPI decoding: MISO|MOSI
+
+         If the TX or RX channel source in RS232 decoding or the MISO or MOSI channel
+        source in SPI decoding is set to OFF, <col> cannot be set to the corresponding
+        parameter.
+
+        :param val:
+        :return:
+        """
+
+        # todo: call decoder<>:mode in order to check if val is valid for decoder state
+        # assert val in {E}
+        self.visa_write(f':col {val}')
+
+    @property
+    def row(self) -> int:
+        """
+        The query returns the current row in integer. If the current even table is empty, the
+        query returns 0.
+
+        :return:
+        """
+
+        return self.visa_ask(':row?')
+
+    @row.setter
+    def row(self, val: int):
+        """
+        val must be 1 to the maximum number of rows of the current event table
+        :param val:
+        :return:
+        """
+        # todo: figure out how many rows are in the event table
+
+        self.visa_write(f':row {val}')
+
+    @property
+    def reverse_sorted(self) -> bool:
+        """
+        Query the display type of the decoding results in the event table.
+        :return:
+        """
+        return "DESC" == self.visa_ask(':sort?')
+
+    @reverse_sorted.setter
+    def reverse_sorted(self, val: bool):
+        """
+        Set the display type of the decoding results in the event table.
+        :param val:
+        :return:
+        """
+        self.visa_write(f':sort {"DESC" if val else "ASC"}')
+
+    def get_data(self) -> any:
+        # todo: test and expand this when I have test data to work with
+        return self.visa_ask(':data?')
 
 
 # incomplete
@@ -398,7 +545,13 @@ class IEEE488(CommandMenu):
         """
         Restore the instrument to the default state.
         """
+        print("Reset can take several seconds to complete")
+        old_timeout = self.visa_resource.timeout
+        self.visa_resource.timeout = None
         self.visa_write("rst")
+        wait_for_resp = self.operation_complete  # Wait for queued response before moving onto next command
+        self.visa_resource.timeout = old_timeout
+        print("Reset complete")
 
     @property
     def status_register_enable_mask(self) -> int:
@@ -439,68 +592,218 @@ class IEEE488(CommandMenu):
 
 # incomplete
 class LA(CommandMenu):
+    """
+    The :LA commands are used to perform the related operations on the digital channels. These commands
+    are only applicable to DS1000Z Plus with the MSO upgrade option.
+    """
+    # todo: write this command menu
     cmd_hierarchy_str = ":la"
 
 
 # incomplete
 class LAN(CommandMenu):
     cmd_hierarchy_str = ":lan"
+    # todo: write this command menu
 
 
 # incomplete
 class Math(CommandMenu):
     cmd_hierarchy_str = ":math"
+    # todo: write this command menu
 
 
 # incomplete
 class Mask(CommandMenu):
+    """
+    The :MASK commands are used to set and query the pass/fail test parameters.
+    """
     cmd_hierarchy_str = ":mask"
+    # todo: write this command menu
+
+
+class MeasureCounter(CommandMenu):
+    cmd_hierarchy_str = ":meas:coun"
+
+    @property
+    def source(self) -> str:
+        """
+        Query the source of the frequency counter, or disable the frequency counter.
+        :return: string identifying counter measurement source
+        """
+        return self.visa_ask(f':sour?')
+
+    @source.setter
+    def source(self, val: str):
+        """
+        Set the source of the frequency counter, or disable the frequency counter.
+
+        :param val: The counter source to select
+        :return: None
+        """
+
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital}
+        else:
+            assert val in sources_analog
+
+        self.visa_write(f':sour {val}')
+
+    @property
+    def value(self) -> float:
+        """
+        Query the measurement result of the frequency counter. The default unit is Hz.
+        :return:
+        """
+        return float(self.visa_ask(f':val?'))
+
+
+# incomplete
+class MeasureSetup(CommandMenu):
+    cmd_hierarchy_str = ":meas:set"
+
+
+# incomplete
+class MeasureStatistic(CommandMenu):
+    cmd_hierarchy_str = ":meas:stat"
 
 
 # incomplete
 class Measure(CommandMenu):
+    """
+    DS1000Z supports the auto measurement of the following 37 waveform parameters and provides the
+    statistic function for the measurement results.
+
+    In additional, you can use the frequency counter to make more precise frequency measurement.
+
+    Measure commands are used to set and query the measurement parameters.
+    """
     cmd_hierarchy_str = ":meas"
 
+    def __init__(self, visa_resource: _visa.Resource):
+        super().__init__(visa_resource)
+
+        self.counter = MeasureCounter(visa_resource)
+        self.setup = MeasureSetup(visa_resource)
+        self.statistic = MeasureStatistic(visa_resource)
+
     @property
-    def source(self):
-        self.visa_ask(f':sour?')
-        return self._osc.selected_channel()
+    def source(self) -> str:
+        """
+        Query the source of the current measurement parameter.
+        :return: string identifying current measurement source
+        """
+        return self.visa_ask(f':sour?')
 
-    def get_voltage_rms_v(self):
-        assert 1 <= self._channel <= 4, 'Invalid channel.'
-        return self.visa_ask(f':ITEM? VRMS,CHAN{self._channel}')
+    @source.setter
+    def source(self, val: str):
+        """
+        Set the source of the current measurement parameter.
 
-    def channel_selected(self):
-        self._osc.write(f':SOUR CHAN{self._channel}')
-        return self._osc.selected_channel()
+        :param val: The source to select
+        :return: None
+        """
 
-    def selected_channel(self):
-        return self.visa_ask(':MEAS:SOUR?')
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital, *sources_math}
+        else:
+            assert val in {*sources_analog, *sources_math}
+
+        self.visa_write(f':sour {val}')
+
+    def clear(self, item_num: int):
+        """
+        Clear one or all of the last five measurement items enabled
+        Pass the item number to disable that item
+        Pass -1 to disable all
+
+        :param item_num: Item to clear
+        :return:
+        """
+        assert item_num in {-1, 1, 2, 3, 4, 5}
+        if item_num == -1:
+            self.visa_write(f':cle ALL')
+        else:
+            self.visa_write(f':cle ITEM{item_num}')
+
+    def recover(self, item_num: int):
+        """
+        Recover the measurement item which has been cleared
+        Pass the item number to recover that item
+        Pass -1 to recover all
+
+        :param item_num: Item to recover
+        :return:
+        """
+        assert item_num in {-1, 1, 2, 3, 4, 5}
+        if item_num == -1:
+            self.visa_write(f':rec ALL')
+        else:
+            self.visa_write(f':rec ITEM{item_num}')
+
+    @property
+    def all_measurement(self)->bool:
+        return bool(int(self.visa_ask(f':adis?')))
+
+    @all_measurement.setter
+    def all_measurement(self, val: bool):
+        """
+        Enable or disable the all measurement function, or query the status of the all measurement function
+
+         The all measurement function can measure the following 29 parameters of the source at the same time:
+            Voltage Parameters:
+                Vmax, Vmin, Vpp, Vtop, Vbase, Vamp,
+                Vupper, Vmid, Vlower, Vavg, Vrms,
+                Overshoot, Preshoot, Period Vrms, and Variance
+
+            Time Parameters:
+                Period, Frequency, Rise Time, Fall Time, +Width, -Width, +Duty, -Duty, tVmax, and tVmin
+
+            Other Parameters:
+                +Rate, -Rate, Area, and Period Area.
+
+         The all measurement function can measure CH1, CH2, CH3, CH4, and the MATH
+        channel at the same time. You can send the :MEASure:AMSource command to set
+        the source of the all measurement function.
+
+        :param val:
+        :return:
+        """
+        self.visa_write(f':adis {1 if val else 0}')
+
+
+    # todo: figure out how to handle item measurement
+    @property
+    def item(self):
+        raise NotImplementedError
 
 
 # incomplete
 class Reference(CommandMenu):
-    cmd_hierarchy_str = ":meas"
+    cmd_hierarchy_str = ":ref"
 
 
 # incomplete
 class Source(CommandMenu):
-    cmd_hierarchy_str = ":meas"
+    cmd_hierarchy_str = ":sour"
 
 
 # incomplete
 class Storage(CommandMenu):
-    cmd_hierarchy_str = ":meas"
+    cmd_hierarchy_str = ":stor"
 
 
 # incomplete
 class System(CommandMenu):
-    cmd_hierarchy_str = ":meas"
+    cmd_hierarchy_str = ":syst"
 
 
 # incomplete
 class Trace(CommandMenu):
-    cmd_hierarchy_str = ":meas"
+    cmd_hierarchy_str = ":trac"
 
 
 class TimebaseDelay(CommandMenu):

@@ -1,3 +1,17 @@
+"""
+This module contains definitions for discrete string constants used in communication with Rigol100z series oscilloscopes
+"""
+
+
+class ScopeModel:
+    DS1104Z_S_Plus = "DS1104Z-S Plus"
+    DS1074Z_S_Plus = "DS1074Z-S Plus"
+    DS1104Z_Plus = "DS1104Z Plus"
+    DS1104Z = "DS1104Z"  # Hacked model
+    DS1074Z_Plus = "DS1074Z Plus"
+    DS1054Z = "DS1054Z"
+
+
 class EAcquireModes:
     Normal = "NORM"
     Averages = "AVER"
@@ -14,6 +28,26 @@ class EDisplayGrid:
     Full = "FULL"
     Half = "HALF"
     NoGrid = "NONE"
+
+
+class EEventtableFormat:
+    Hex = "HEX"
+    Ascii = "ASC"
+    Decimal = "DEC"
+
+
+class EEventtableViewFormat:
+    Package = "PACK"
+    Detail = "DET"
+    Payload = "PAYL"
+
+
+class EEventtableColumn:
+    Data = "DATA"
+    Tx = "TX"
+    Rx = "RX"
+    MISO = "MISO"
+    MOSI = "MOSI"
 
 
 class ESource:

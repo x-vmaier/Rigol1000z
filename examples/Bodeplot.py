@@ -1,3 +1,8 @@
+"""
+This file no longer works due to undefined dependencies and Rigol1000z library rewrite.
+# todo: rewrite this in order to adhere to pep8, and use new library interface
+"""
+
 import visa
 import rigol1000z
 from tqdm import tqdm
@@ -5,17 +10,19 @@ import numpy as np
 import keyboard
 import time
 
+
 class BodePlot_Point:
     def __init__(self, vin, vout, delay, frequency):
         self.vin = vin
         self.vout = vout
         self.delay = delay
         self.frequency = frequency
-        
+
         self.phase = (delay * frequency) * 2 * np.pi
         self.H = 20 * np.log10(vout / vin)
 
-def captureBodePlot(scope, num, time_total_ms = 4000, time_setup_ms = 1400):
+
+def captureBodePlot(scope, num, time_total_ms=4000, time_setup_ms=1400):
     '''
     Captures the amplitude of signals on channel 1 (Vin) and 2 (Vout), the time delay 
     between the signals, and the frequency of the signal on Channel 1. It repeats the 
@@ -46,9 +53,9 @@ def captureBodePlot(scope, num, time_total_ms = 4000, time_setup_ms = 1400):
     scope.visa_write(':MEASure:STATistic:ITEM VPP,CHANnel1')
     scope.visa_write(':MEASure:STATistic:ITEM VPP,CHANnel2')
     scope.visa_write(':MEASure:STATistic:ITEM RDELay')
-    
+
     data = []
-    
+
     mills_time = lambda: int(round(time.time() * 1000))
     numPointsTaken = 0
     lastMeasurement = mills_time()
@@ -69,7 +76,7 @@ def captureBodePlot(scope, num, time_total_ms = 4000, time_setup_ms = 1400):
                         vout = float(scope.visa_ask(':MEASure:STATistic:ITEM? AVERages,VPP,CHANnel2'))
                         delay = float(scope.visa_ask(':MEASure:STATistic:ITEM? AVERages,RDELay'))
                         freq = float(scope.visa_ask(':MEASure:COUNter:VALue?'))
-                        
+
                         data += [BodePlot_Point(vin, vout, delay, freq)]
 
                         pbar.update(1)
@@ -77,10 +84,10 @@ def captureBodePlot(scope, num, time_total_ms = 4000, time_setup_ms = 1400):
                         if numPointsTaken == num:
                             break
                         lastMeasurement = mills_time()
-                        inSetup=True
+                        inSetup = True
             except:
                 break
-    
+
     return data
 
 
@@ -93,10 +100,10 @@ print('ID: ', rigolScope.get_id())
 
 data = captureBodePlot(rigolScope, 10)
 
-#--------------------------------------------------------------------------------------------
-#--------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
 #                           DATA PROCESSING AND GRAPHING GOES HERE
-#--------------------------------------------------------------------------------------------
-#--------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------
 
 scope.close()

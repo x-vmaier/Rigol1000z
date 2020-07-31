@@ -1,39 +1,37 @@
 import pyvisa as visa
 import Rigol1000z
-from time import sleep
 from Rigol1000z.constants import EWaveformMode
+
+# Initialize the visa resource manager
 rm = visa.ResourceManager()
 
-# We are connecting the oscilloscope through USB here.
-# Only one VISA-compatible instrument is connected to our computer,
-# thus the first resource on the list is our oscilloscope.
-# You can see all connected and available local devices calling
-#
+# Get the first visa device connected
+osc_resource = rm.open_resource(rm.list_resources()[0])
 
-osc_resource: visa.Resource = rm.open_resource(rm.list_resources()[0])
-
+# Create
 with Rigol1000z.Rigol1000z(osc_resource) as osc:
-    print(type(osc[1]))
+    # start with known state by restoring default settings
+    osc.ieee488.reset()
+
+    # run data acquisition
+    osc.run()
 
     # Change voltage range of channel 1 to 50mV/div.
-    # osc[1].set_vertical_scale_v(50e-3)
+    osc[1].scale_v = 50e-3
+
+    # Autoscale the scope
     osc.autoscale()
-    sleep(4.0)
 
-    osc.run()
-    sleep(0.5)
-
-    # Stop the scope.
+    # Stop the scope in order to collect data.
     osc.stop()
 
-    # Take a screenshot.
-    # osc.get_screenshot('screenshot.png', 'png')
+    # Take a screenshot of the scope's display
+    osc.get_screenshot('screenshot.png', 'png')
 
-    # Capture the data sets from channels 1--4 and
-    # write the data sets to their own file.
-    # for c in range(1, 4):
-
-    # osc[c].get_data('raw', 'channel%i.dat' % c)
+    # todo: collect data from all enabled channels of the scope
     osc.get_data(EWaveformMode.Raw, './channel1.csv')
+
+    # Move back to run mode when data collection is complete
+    osc.run()
 
 print("done")
