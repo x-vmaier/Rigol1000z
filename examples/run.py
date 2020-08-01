@@ -8,8 +8,9 @@ rm = visa.ResourceManager()
 # Get the first visa device connected
 osc_resource = rm.open_resource(rm.list_resources()[0])
 
-# Create
+# Create oscilloscope interface
 with Rigol1000z.Rigol1000z(osc_resource) as osc:
+
     # start with known state by restoring default settings
     osc.ieee488.reset()
 

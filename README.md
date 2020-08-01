@@ -1,16 +1,25 @@
 # Rigol1000z
 Python library to control Rigol DS1000z series oscilloscopes based on the VISA protocol (PyVISA). The oscilloscope can be connected either by USB or by Ethernet to the local network (See PyVISA docs for more information).
 
-Tested on Windows 10.
+## Platforms
+* Windows 10 - Tested
+* ArchLinux - when forked, [@jeanyvesb9](https://github.com/jeanyvesb9/Rigol1000z) said his version worked so I suspect compatibility.
 
 ## Dependencies
-* [python3.7](https://www.python.org/downloads/release)
-* [numpy](https://github.com/numpy/numpy)
-* [pyvisa](https://github.com/pyvisa/pyvisa)
-* [tqdm](https://github.com/tqdm/tqdm)
+* [python3.7](https://www.python.org/downloads/release)+ Python version as f-strings are used in the library
+* [numpy](https://github.com/numpy/numpy) Library for efficient storage and processing of arrays
+* [pyvisa](https://github.com/pyvisa/pyvisa) Visa communication protocol
+* [tqdm](https://github.com/tqdm/tqdm) Command line progress bar
 
 ## Recommended
-* [pipenv](https://pypi.org/project/pipenv/) makes 
+* [pipenv](https://pypi.org/project/pipenv/)
+makes installation of requirements easier and separates python environments reducing the probability of package dependency conflicts.
+To install run the following commands from your working directory 
+
+```python
+$ pip install pipenv
+$ pipenv install
+```
 
 ## Example
 ```python

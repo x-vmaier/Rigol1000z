@@ -2,12 +2,12 @@ import os
 import numpy as _np
 import tqdm as _tqdm
 import pyvisa as _visa
-from Rigol1000z.commandmenu import CommandMenu
+from Rigol1000z.rigol1000zcommandmenu import Rigol1000zCommandMenu
 from time import sleep
 from Rigol1000z.commands import *
 
 
-class Rigol1000z(CommandMenu):
+class Rigol1000z(Rigol1000zCommandMenu):
     """
     Rigol DS1000z series oscilloscope driver.
     """
@@ -49,7 +49,7 @@ class Rigol1000z(CommandMenu):
         self.math = Math(self.visa_resource)  # NC
         self.mask = Mask(self.visa_resource)  # NC
 
-        self.measure = Measure(self.visa_resource)  # WIP
+        self.measure = Measure(self.visa_resource)  # WIP (need to complete item, and statistic:item commands)
 
         self.reference = Reference(self.visa_resource)  # NC
 

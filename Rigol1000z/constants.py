@@ -12,14 +12,14 @@ class ScopeModel:
     DS1054Z = "DS1054Z"
 
 
-class EAcquireModes:
+class EAcquireMode:
     Normal = "NORM"
     Averages = "AVER"
     Peak = "PEAK"
     HighResolution = "HRES"
 
 
-class EDisplayModes:
+class EDisplayMode:
     Vectors = "VEC"
     Dots = "DOTS"
 
@@ -48,6 +48,67 @@ class EEventtableColumn:
     Rx = "RX"
     MISO = "MISO"
     MOSI = "MOSI"
+
+
+class EMeasureStatisticMode:
+    Difference = "DIFF"
+    Extremum = "EXTR"
+
+
+class EMeasureItem:
+
+    VoltageMax = "VMAX"
+    VoltageMin = "VMIN"
+    VoltagePeakToPeak = "VPP"
+    VoltageTop = "VTOP"
+    VoltageBase = "VBASe"
+    VoltageAmplitude = "VAMP"
+
+    VoltageUpper = "VUP"
+    VoltageMid = "VMID"
+    VoltageLower = "VLOW"
+    VoltageAverage = "VAVG"
+
+    VoltageRMS = "VRMS"
+    VRmsPeriod = "PVRMS"
+
+    VoltageOvershoot = "OVER"
+    VoltagePreshoot = "PRES"
+
+    Area = "MAR"
+    AreaPeriod = "MPAR"
+
+    Period = "PER"
+
+    Frequency = "FREQ"
+
+    RiseTime = "RTIM"
+    FallTime = "FTIM"
+
+    WidthPositive = "PWID"
+    WidthNegative = "NWID"
+
+    DutyPositive = "PDUT"
+    DutyNegative = "NDUT"
+
+    DelayRise = "RDEL"
+    DelayFall = "FDEL"
+
+    PhaseRise = "RPH"
+    PhaseFall = "FPH"
+
+    TVMax = "TVMAX"  # time to voltage max?
+    TVMin = "TVMIN"  # time to voltage min?
+
+    SlewRatePositive = "PSLEW"
+    SlewRateNegative = "NSLEW"
+
+    Variance = "VARI"
+
+    PulsesPositive = "PPUL"
+    PulsesNegative = "NPUL"
+    EdgesPositive = "PEDG"
+    EdgesNegative = "NEDG"
 
 
 class ESource:

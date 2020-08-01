@@ -2,12 +2,12 @@ import os
 import numpy as _np
 import tqdm as _tqdm
 import pyvisa as _visa
-from Rigol1000z.commandmenu import CommandMenu
+from Rigol1000z.rigol1000zcommandmenu import Rigol1000zCommandMenu
 from Rigol1000z.constants import *
-from typing import List, Union
+from typing import List, Union, Iterable
 
 
-class Channel(CommandMenu):
+class Channel(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -152,7 +152,7 @@ class Channel(CommandMenu):
         self.visa_write(f':vern {int(val is True)}')
 
 
-class Acquire(CommandMenu):
+class Acquire(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -227,7 +227,7 @@ class Acquire(CommandMenu):
 
     @mode.setter
     def mode(self, val: str):
-        assert val in {EAcquireModes.Normal, EAcquireModes.Averages, EAcquireModes.HighResolution, EAcquireModes.Peak}
+        assert val in {EAcquireMode.Normal, EAcquireMode.Averages, EAcquireMode.HighResolution, EAcquireMode.Peak}
         self.visa_write(f':type {val}')
 
     @property
@@ -249,7 +249,7 @@ class Acquire(CommandMenu):
         return float(self.visa_ask(':srat?'))
 
 
-class Calibrate(CommandMenu):
+class Calibrate(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -261,16 +261,16 @@ class Calibrate(CommandMenu):
 
 
 # incomplete
-class Cursor(CommandMenu):
+class Cursor(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":curs"
 
 
 # incomplete
-class Decoder(CommandMenu):
+class Decoder(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":dec"
 
 
-class Display(CommandMenu):
+class Display(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -288,7 +288,7 @@ class Display(CommandMenu):
 
     @mode.setter
     def mode(self, val: str):
-        assert val in {EDisplayModes.Vectors, EDisplayModes.Dots}
+        assert val in {EDisplayMode.Vectors, EDisplayMode.Dots}
         self.visa_write(f':type {val}')
 
     @property
@@ -367,7 +367,7 @@ class Display(CommandMenu):
         self.visa_write(f':GBR {int(val * 100)}')
 
 
-class EventTable(CommandMenu):
+class EventTable(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -496,11 +496,11 @@ class EventTable(CommandMenu):
 
 
 # incomplete
-class Function(CommandMenu):
+class Function(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":func"
 
 
-class IEEE488(CommandMenu):
+class IEEE488(Rigol1000zCommandMenu):
     """
     Complete
     """
@@ -591,7 +591,7 @@ class IEEE488(CommandMenu):
 
 
 # incomplete
-class LA(CommandMenu):
+class LA(Rigol1000zCommandMenu):
     """
     The :LA commands are used to perform the related operations on the digital channels. These commands
     are only applicable to DS1000Z Plus with the MSO upgrade option.
@@ -601,19 +601,19 @@ class LA(CommandMenu):
 
 
 # incomplete
-class LAN(CommandMenu):
+class LAN(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":lan"
     # todo: write this command menu
 
 
 # incomplete
-class Math(CommandMenu):
+class Math(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":math"
     # todo: write this command menu
 
 
 # incomplete
-class Mask(CommandMenu):
+class Mask(Rigol1000zCommandMenu):
     """
     The :MASK commands are used to set and query the pass/fail test parameters.
     """
@@ -621,7 +621,10 @@ class Mask(CommandMenu):
     # todo: write this command menu
 
 
-class MeasureCounter(CommandMenu):
+class MeasureCounter(Rigol1000zCommandMenu):
+    """
+    Complete
+    """
     cmd_hierarchy_str = ":meas:coun"
 
     @property
@@ -659,18 +662,248 @@ class MeasureCounter(CommandMenu):
         return float(self.visa_ask(f':val?'))
 
 
-# incomplete
-class MeasureSetup(CommandMenu):
+class MeasureSetup(Rigol1000zCommandMenu):
+    """
+    Complete
+    """
     cmd_hierarchy_str = ":meas:set"
 
+    @property
+    def max(self) -> float:
+        """
+        Query the upper limit of the threshold (expressed in the ratio of amplitude) in
+        time, delay, and phase measurements.
+
+        :return:
+        """
+        return float(round(self.visa_ask(f':max?'))) / 100.0
+
+    @max.setter
+    def max(self, val: float):
+        """
+        Set the upper limit of the threshold (expressed in the ratio of amplitude) in
+        time, delay, and phase measurements.
+
+        :return:
+        """
+        assert 0.07 <= val <= 0.95
+        self.visa_write(f':max {round(val * 100.0)}')
+
+    @property
+    def mid(self) -> float:
+        """
+        Query the middle point of the threshold (expressed in the percentage of amplitude)
+        in time, delay, and phase measurements.
+
+        :return:
+        """
+        return float(round(self.visa_ask(f':mid?'))) / 100.0
+
+    @max.setter
+    def mid(self, val: float):
+        """
+        Set the middle point of the threshold (expressed in the percentage of amplitude)
+        in time, delay, and phase measurements.
+
+        :return:
+        """
+        assert 0.06 <= val <= 0.94
+        self.visa_write(f':mid {round(val * 100.0)}')
+
+    @property
+    def min(self) -> float:
+        """
+        Query the lower limit of the threshold (expressed in the percentage of amplitude) in
+        time, delay, and phase measurements.
+
+        :return:
+        """
+        return float(round(self.visa_ask(f':mid?'))) / 100.0
+
+    @max.setter
+    def min(self, val: float):
+        """
+        Set the lower limit of the threshold (expressed in the percentage of amplitude) in
+        time, delay, and phase measurements.
+
+        :return:
+        """
+        assert 0.05 <= val <= 0.93
+        self.visa_write(f':mid {round(val * 100.0)}')
+
+    @property
+    def phase_source_a(self) -> str:
+        """
+        Query source A of Phase 1→2 (rising edge) and Phase 1→2 (falling edge) measurements.
+        :return:
+        """
+        return str(self.visa_ask(f':psa?'))
+
+    @phase_source_a.setter
+    def phase_source_a(self, val: str):
+        """
+        Set source A of Phase (rising edge) 1→2 and Phase (falling edge) 1→2 measurements.
+        :param val: The source to set the phase source to
+        :return:
+        """
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital}
+        else:
+            assert val in sources_analog
+
+        self.visa_write(f':psa {val}')
+
+    @property
+    def phase_source_b(self) -> str:
+        """
+        Query source B of Phase 1→2 (rising edge) and Phase 1→2 (falling edge) measurements.
+        :return:
+        """
+        return str(self.visa_ask(f':psb?'))
+
+    @phase_source_b.setter
+    def phase_source_b(self, val: str):
+        """
+        Set source B of Phase (rising edge) 1→2 and Phase (falling edge) 1→2 measurements.
+        :param val: The source to set the phase source to
+        :return:
+        """
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital}
+        else:
+            assert val in sources_analog
+
+        self.visa_write(f':psb {val}')
+
+    @property
+    def delay_source_a(self) -> str:
+        """
+        Query source A of Delay 1→2 (rising edge) and Delay 1→2 (falling edge) measurements.
+
+        :return:
+        """
+        return str(self.visa_ask(f':dsa?'))
+
+    @delay_source_a.setter
+    def delay_source_a(self, val: str):
+        """
+        Set source A of Delay 1→2 (rising edge) and Delay 1→2 (falling edge) measurements.
+
+        :param val:
+        :return:
+        """
+
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital}
+        else:
+            assert val in sources_analog
+
+        self.visa_write(f':dsa {val}')
+
+    @property
+    def delay_source_b(self) -> str:
+        """
+        Query source B of Delay 1→2 (rising edge) and Delay 1→2 (falling edge) measurements.
+
+        :return:
+        """
+        return str(self.visa_ask(f':dsb?'))
+
+    @delay_source_b.setter
+    def delay_source_b(self, val: str):
+        """
+        Set source B of Delay 1→2 (rising edge) and Delay 1→2 (falling edge) measurements.
+
+        :param val:
+        :return:
+        """
+
+        # Plus models support digital channels
+        if self.osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
+                              ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}:
+            assert val in {*sources_analog, *sources_digital}
+        else:
+            assert val in sources_analog
+
+        self.visa_write(f':dsb {val}')
+
 
 # incomplete
-class MeasureStatistic(CommandMenu):
+class MeasureStatistic(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":meas:stat"
 
+    @property
+    def enabled(self) -> bool:
+        """
+        Query the status of the statistic function.
+        :return:
+        """
+        return bool(int(self.visa_ask(f':disp?')))
+
+    @enabled.setter
+    def enabled(self, val: bool):
+        """
+        Enable or disable the statistic function.
+        :param val:
+        :return:
+        """
+        self.visa_write(f':disp {1 if val else 0}')
+
+    @property
+    def mode(self) -> str:
+        """
+         DIFFerence:
+            The statistic results contain the current value, average value, standard deviation, and counts.
+
+         EXTRemum:
+            The statistic results contain the current value, average value, minimum, and maximum.
+
+        :return:
+        """
+        return self.visa_ask(f':mode?')
+
+    @mode.setter
+    def mode(self, val: str):
+        """
+         DIFFerence:
+            The statistic results contain the current value, average value, standard deviation, and counts.
+
+         EXTRemum:
+            The statistic results contain the current value, average value, minimum, and maximum.
+
+         Sending the :MEASure:STATistic:DISPlay command can enable the statistic function.
+        When the statistic function is enabled, the oscilloscope makes statistic and displays
+        the statistic results of at most 5 measurement items that are turned on last.
+        :return:
+        """
+
+        assert val in {EMeasureStatisticMode.Difference, EMeasureStatisticMode.Extremum}
+        self.visa_write(f':mode {val}')
+
+    def reset(self) -> None:
+        """
+        Clear the history data and make statistic again.
+        :return:
+        """
+        self.visa_write(':res')
+
+    def item(self):
+        pass
+        # todo: what the fuck is item (pg 145)
+
+
+class MeasureItem:
+    pass
+
 
 # incomplete
-class Measure(CommandMenu):
+class Measure(Rigol1000zCommandMenu):
     """
     DS1000Z supports the auto measurement of the following 37 waveform parameters and provides the
     statistic function for the measurement results.
@@ -745,7 +978,7 @@ class Measure(CommandMenu):
             self.visa_write(f':rec ITEM{item_num}')
 
     @property
-    def all_measurement(self)->bool:
+    def all_measurement(self) -> bool:
         return bool(int(self.visa_ask(f':adis?')))
 
     @all_measurement.setter
@@ -774,39 +1007,123 @@ class Measure(CommandMenu):
         """
         self.visa_write(f':adis {1 if val else 0}')
 
-
-    # todo: figure out how to handle item measurement
     @property
-    def item(self):
-        raise NotImplementedError
+    def all_measurement_source(self) -> List[str]:
+        """
+        Query the source(s) of the all measurement function.
+        :return:
+        """
+        return str(self.visa_ask(f':ams?')).split(",")
+
+    @all_measurement_source.setter
+    def all_measurement_source(self, val: Iterable[str]):
+        """
+        Set the source(s) of the all measurement function.
+        :param val:
+        :return:
+        """
+        self.visa_write(f':ams {",".join(val)}')
+
+    def item(self, measurement_item: str, source_1: str, source_2: Union[None, str] = None):
+        """
+        Measure any waveform parameter of the specified source, or query the measurement
+        result of any waveform parameter of the specified source.
+
+        :param measurement_item:
+        :param source_1:
+        :param source_2:
+        :return:
+        """
+
+        # Check the sources are valid given the model
+        if self.has_digital:
+            assert source_1 in {*sources_analog, *sources_digital, *sources_math}
+            if source_2 is not None:
+                assert source_2 in {*sources_analog, *sources_digital, *sources_math}
+        else:
+            assert source_1 in {*sources_analog, *sources_math}
+            if source_2 is not None:
+                assert source_2 in {*sources_analog, *sources_math}
+
+        # Ensure sources are valid given the measurement type
+        if measurement_item in {
+            EMeasureItem.Period, EMeasureItem.Frequency, EMeasureItem.WidthPositive,
+            EMeasureItem.WidthNegative,
+            EMeasureItem.DutyPositive, EMeasureItem.DutyNegative, EMeasureItem.DelayRise,
+            EMeasureItem.DelayFall,
+            EMeasureItem.PhaseRise, EMeasureItem.PhaseFall
+        }:
+            # Sources can be any source given the measurement item
+            assert source_1 in {*sources_analog, *sources_digital, *sources_math}
+            if source_2 is not None:
+                assert source_2 in {*sources_analog, *sources_digital, *sources_math}
+
+        else:
+            # Sources can only be a channel or math
+            assert source_1 in {*sources_analog, *sources_math}
+            if source_2 is not None:
+                assert source_2 in {*sources_analog, *sources_math}
+
+        # Ensure that the correct number of channels are passed given the command
+        assert source_1 is not None
+
+        # Single source commands
+        if measurement_item in {
+            EMeasureItem.VoltageMax, EMeasureItem.VoltageMin,
+            EMeasureItem.VoltagePeakToPeak,
+            EMeasureItem.VoltageTop, EMeasureItem.VoltageBase,
+            EMeasureItem.VoltageAmplitude, EMeasureItem.VoltageAverage,
+            EMeasureItem.VoltageRMS, EMeasureItem.VRmsPeriod,
+            EMeasureItem.VoltageOvershoot, EMeasureItem.VoltagePreshoot,
+            EMeasureItem.Area, EMeasureItem.AreaPeriod,
+            EMeasureItem.Period, EMeasureItem.Frequency,
+            EMeasureItem.RiseTime, EMeasureItem.FallTime,
+            EMeasureItem.WidthPositive, EMeasureItem.WidthNegative,
+            EMeasureItem.DutyPositive, EMeasureItem.DutyNegative,
+            EMeasureItem.TVMax, EMeasureItem.TVMin,
+            EMeasureItem.SlewRatePositive, EMeasureItem.SlewRateNegative,
+            EMeasureItem.VoltageUpper, EMeasureItem.VoltageMid, EMeasureItem.VoltageLower,
+            EMeasureItem.Variance,
+            EMeasureItem.PulsesPositive, EMeasureItem.PulsesNegative,
+            EMeasureItem.EdgesPositive, EMeasureItem.EdgesNegative
+        }:
+            assert source_2 is None
+
+        # Double source commands
+        elif measurement_item in {
+            EMeasureItem.DelayRise, EMeasureItem.DelayFall, EMeasureItem.PhaseRise, EMeasureItem.PhaseFall
+        }:
+            assert source_2 is not None
+
+        # todo: implement both read and write... wtf
 
 
 # incomplete
-class Reference(CommandMenu):
+class Reference(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":ref"
 
 
 # incomplete
-class Source(CommandMenu):
+class Source(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":sour"
 
 
 # incomplete
-class Storage(CommandMenu):
+class Storage(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":stor"
 
 
 # incomplete
-class System(CommandMenu):
+class System(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":syst"
 
 
 # incomplete
-class Trace(CommandMenu):
+class Trace(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":trac"
 
 
-class TimebaseDelay(CommandMenu):
+class TimebaseDelay(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":tim:del"
 
     @property
@@ -850,7 +1167,7 @@ class TimebaseDelay(CommandMenu):
         self.visa_write(f':offs {val}')
 
 
-class Timebase(CommandMenu):
+class Timebase(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":tim"
 
     def __init__(self, visa_resource):
@@ -885,7 +1202,7 @@ class Timebase(CommandMenu):
 
 
 # incomplete
-class TriggerEdge(CommandMenu):
+class TriggerEdge(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":trig:edg"
 
     @property
@@ -898,7 +1215,7 @@ class TriggerEdge(CommandMenu):
 
 
 # incomplete
-class Trigger(CommandMenu):
+class Trigger(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":trig"
 
     def __init__(self, visa_resource):
@@ -935,7 +1252,7 @@ class PreambleContext:
         self.y_reference: float = float(pre[9])
 
 
-class Waveform(CommandMenu):
+class Waveform(Rigol1000zCommandMenu):
     """
     Complete
     """
