@@ -1,6 +1,7 @@
 import pyvisa as visa
-import Rigol1000z
-from Rigol1000z.constants import EWaveformMode
+from Rigol1000z import Rigol1000z
+from time import sleep
+from Rigol1000z.constants import *
 
 # Initialize the visa resource manager
 rm = visa.ResourceManager()
@@ -8,29 +9,29 @@ rm = visa.ResourceManager()
 # Get the first visa device connected
 osc_resource = rm.open_resource(rm.list_resources()[0])
 
-# Create oscilloscope interface
-with Rigol1000z.Rigol1000z(osc_resource) as osc:
+# Create oscilloscope interface using with statement!
+with Rigol1000z(osc_resource) as osc:
+    osc.ieee488.reset()  # start with known state by restoring default settings
 
-    # start with known state by restoring default settings
-    osc.ieee488.reset()
+    # osc.autoscale()  # Autoscale the scope
 
-    # run data acquisition
-    osc.run()
+    # Set the horizontal timebase
+    osc.timebase.mode = ETimebaseMode.Main  # Set the timebase mode to main (normal operation)
+    osc.timebase.scale = 10 * 10 ** -6  # Set the timebase scale
 
-    # Change voltage range of channel 1 to 50mV/div.
-    osc[1].scale_v = 50e-3
+    # Go through each channel
+    for i in range(1, 5):
+        osc[i].enabled = True  # Enable the channel
+        osc[i].scale_v = 1000e-3  # Change voltage range of the channel to 1.0V/div.
 
-    # Autoscale the scope
-    osc.autoscale()
+    osc.run()  # Run the scope if not already
+    sleep(0.5)  # Let scope collect the waveform
 
-    # Stop the scope in order to collect data.
-    osc.stop()
+    osc.stop()  # Stop the scope in order to collect data.
 
-    # Take a screenshot of the scope's display
-    osc.get_screenshot('screenshot.png', 'png')
+    osc.get_screenshot('./screenshot.png')  # Take a screenshot of the scope's display
 
-    # todo: collect data from all enabled channels of the scope
-    osc.get_data(EWaveformMode.Raw, './channel1.csv')
+    osc.get_data(EWaveformMode.Raw, './channels.csv')  # Collect and save waveform data from all enabled channels
 
     # Move back to run mode when data collection is complete
     osc.run()

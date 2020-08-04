@@ -16,8 +16,6 @@ class Rigol1000z(Rigol1000zCommandMenu):
         # Instantiate The scope as a visa command menu
         super().__init__(visa_resource)
 
-
-
         # Initialize IEEE device identifier command in order to determine the model
         brand, model, serial_number, software_version, *add_args = self._idn_cache.split(",")
 
@@ -30,10 +28,10 @@ class Rigol1000z(Rigol1000zCommandMenu):
         }
 
         # Define Channels 1-4
-        self.channels = [Channel(self.visa_resource, c) for c in range(1, 5)]
+        self.channel_list = [Channel(self.visa_resource, c) for c in range(1, 5)]
 
         # acquire must be able to count enabled channels
-        self.acquire = Acquire(self.visa_resource, self.channels)
+        self.acquire = Acquire(self.visa_resource, self.channel_list)
         self.calibrate = Calibrate(self.visa_resource)
 
         self.cursor = Cursor(self.visa_resource)  # NC
@@ -46,7 +44,8 @@ class Rigol1000z(Rigol1000zCommandMenu):
 
         self.ieee488 = IEEE488(self.visa_resource)
 
-        self.la = LA(self.visa_resource)  # NC
+        if self.has_digital:
+            self.la = LA(self.visa_resource)  # NC
         self.lan = LAN(self.visa_resource)  # NC
         self.math = Math(self.visa_resource)  # NC
         self.mask = Mask(self.visa_resource)  # NC
@@ -87,10 +86,10 @@ class Rigol1000z(Rigol1000zCommandMenu):
         """
         # assert i in {c.channel for c in self._channels}
         assert 1 <= i <= 4, 'Not a valid channel.'
-        return self.channels[i - 1]
+        return self.channel_list[i - 1]
 
     def __len__(self):
-        return len(self.channels)
+        return len(self.channel_list)
 
     def autoscale(self):
         print("Autoscaling can take several seconds to complete")
@@ -117,29 +116,39 @@ class Rigol1000z(Rigol1000zCommandMenu):
         self.visa_write(':tfor')
 
     def get_channels_enabled(self):
-        return [c.enabled() for c in self.channels]
+        return [c.enabled() for c in self.channel_list]
 
     # todo: make this more closely knit with the library
-    def get_screenshot(self, filename=None, img_format='png'):
+    def get_screenshot(self, filename=None):
         """
         Downloads a screenshot from the oscilloscope.
 
         Args:
             filename (str): The name of the image file.  The appropriate
                 extension should be included (i.e. jpg, png, bmp or tif).
-            img_format (str): The format image that should be downloaded.  Options
-                are 'jpeg, 'png', 'bmp8', 'bmp24' and 'tiff'.  It appears that
-                'jpeg' takes <3sec to download while all the other formats take
-                <0.5sec.  Default is 'png'.
         """
+        img_format = None
+        # The format image that should be downloaded.
+        # Options are 'jpeg, 'png', 'bmp8', 'bmp24' and 'tiff'.
+        # It appears that 'jpeg' takes <3sec to download
+        # other formats take <0.5sec.
+        # Default is 'png'.
+
+        try:
+            img_format = filename.split(".")[-1].lower()
+        except KeyError:
+            img_format = "png"
 
         assert img_format in ('jpeg', 'png', 'bmp8', 'bmp24', 'tiff')
+
+        sleep(0.5)  # Wait for display to update
 
         # Due to the up to 3s delay, we are setting timeout to None for this operation only
         old_timeout = self.visa_resource.timeout
         self.visa_resource.timeout = None
 
-        raw_img = self.visa_ask_raw(':disp:data? on,off,%s' % img_format, 3850780)[11:-4]
+        # Collect the image data from the scope
+        raw_img = self.visa_ask_raw(f':disp:data? on,off,{img_format}', 3850780)[11:-4]
 
         self.visa_resource.timeout = old_timeout
 
@@ -169,56 +178,71 @@ class Rigol1000z(Rigol1000zCommandMenu):
                 and the second list is the voltage values.
 
         """
-        assert mode in {EWaveformMode.Normal, EWaveformMode.Raw}
 
-        # Setup scope
+        # Stop scope to capture waveform state
         self.stop()
 
-        self.waveform.source = ESource.Ch1
+        # Set mode
+        assert mode in {EWaveformMode.Normal, EWaveformMode.Raw}
         self.waveform.mode = mode
+
+        # Set transmission format
         self.waveform.read_format = EWaveformReadFormat.Byte
 
-        # retrieve the data preable
-        info: PreambleContext = self.waveform.data_premable
+        # Create data structures to populate
+        time_series = None
+        all_channel_data = []
 
-        max_num_pts: int = 250000
-        num_blocks: int = info.points // max_num_pts
-        last_block_pts: int = info.points % max_num_pts
+        # Iterate over possible channels
+        for c in range(1, 5):
 
-        datas = []
-        # print(f"Data being gathered for Ch{}")
-        for i in _tqdm.tqdm(range(num_blocks + 1), ncols=60):
-            if i < num_blocks:
-                self.waveform.read_start_point = 1 + i * 250000
-                self.waveform.read_end_point = 250000 * (i + 1)
-            else:
-                if last_block_pts:
-                    self.waveform.read_start_point = 1 + num_blocks * 250000
-                    self.waveform.read_end_point = num_blocks * 250000 + last_block_pts
-                else:
-                    break
-            data = self.visa_ask_raw(':wav:data?', 250000)
+            # Capture the waveform if the channel is enabled
+            if self[c].enabled:
 
-            # with open(f"data_resp_raw{i}.csv", "wb") as f:
-            #    f.write(data)
+                self.waveform.source = self[c].name
 
-            # Get the response length from the header data
-            # data_response_len_bytes = int("".join(chr(c) for c in data[2:11]))
-            # print(f"header resp length={data_response_len_bytes}")
+                # retrieve the data preable
+                info: PreambleContext = self.waveform.data_premable
 
-            data = _np.frombuffer(data[11:-1], 'B')  # Last byte marks the end of the message.
-            datas.append(data)
+                # Generate the time series for the data
+                time_series = _np.arange(0, info.points * info.x_increment, info.x_increment)
 
-        datas = _np.concatenate(datas)
-        v = (datas - info.y_origin - info.y_reference) * info.y_increment
-        t = _np.arange(0, info.points * info.x_increment, info.x_increment)
+                max_num_pts: int = 250000
+                num_blocks: int = info.points // max_num_pts
+                last_block_pts: int = info.points % max_num_pts
+
+                datas = []
+                # print(f"Data being gathered for Ch{}")
+                for i in _tqdm.tqdm(range(num_blocks + 1), ncols=60):
+                    if i < num_blocks:
+                        self.waveform.read_start_point = 1 + i * 250000
+                        self.waveform.read_end_point = 250000 * (i + 1)
+                    else:
+                        if last_block_pts:
+                            self.waveform.read_start_point = 1 + num_blocks * 250000
+                            self.waveform.read_end_point = num_blocks * 250000 + last_block_pts
+                            sleep(0.2)
+                        else:
+                            break
+                    data = self.visa_ask_raw(':wav:data?', 250000)
+
+                    data = _np.frombuffer(data[11:-1], 'B')  # Last byte marks the end of the message.
+                    datas.append(data)
+
+                # Attach each data packet received into a complete data series
+                datas = _np.concatenate(datas)
+
+                # Add the data series to the list of data series
+                all_channel_data.append(
+                    (datas - info.y_origin - info.y_reference) * info.y_increment
+                )
 
         if filename:
-            print(filename)
+            print(f"writing to: {filename}")
             try:
                 os.remove(filename)
             except OSError:
                 pass
-            _np.savetxt(filename, _np.c_[t, v], '%.12e', ', ', '\n')
+            _np.savetxt(filename, _np.column_stack((time_series, *all_channel_data)), '%.12e', ', ', '\n')
 
-        return t, v
+        return time_series, all_channel_data

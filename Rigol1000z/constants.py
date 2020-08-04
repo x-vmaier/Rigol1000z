@@ -110,12 +110,18 @@ class EMeasureItem:
     EdgesNegative = "NEDG"
 
 
-class MeasurementStatisticItemType:
+class EMeasurementStatisticItemType:
     Maximum = "MAX"
     Minimum = "MIN"
     Current = "CURR"
     Average = "AVER"
     Deviation = "DEV"
+
+
+class ETimebaseMode:
+    Main = 'main'
+    XY = 'xy'
+    Roll = 'roll'
 
 
 class ESource:

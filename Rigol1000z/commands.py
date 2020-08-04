@@ -23,6 +23,10 @@ class Channel(Rigol1000zCommandMenu):
         return self._channel
 
     @property
+    def name(self):
+        return f"CHAN{self.channel}"
+
+    @property
     def bw_limit_20mhz(self):
         resp = self.visa_ask(':bwl?')
         return resp == "20M"
@@ -404,7 +408,6 @@ class EventTable(Rigol1000zCommandMenu):
 
     @display_format.setter
     def display_format(self, val: str):
-
         assert val in {EEventtableFormat.Hex, EEventtableFormat.Ascii, EEventtableFormat.Decimal}
         self.visa_write(f':form {val}')
 
@@ -854,10 +857,10 @@ class MeasurementStatisticItem(Rigol1000zCommandMenu):
         :return:
         """
         assert stat_measurement_type in {
-            MeasurementStatisticItemType.Maximum, MeasurementStatisticItemType.Minimum,
-            MeasurementStatisticItemType.Current,
-            MeasurementStatisticItemType.Average,
-            MeasurementStatisticItemType.Deviation
+            EMeasurementStatisticItemType.Maximum, EMeasurementStatisticItemType.Minimum,
+            EMeasurementStatisticItemType.Current,
+            EMeasurementStatisticItemType.Average,
+            EMeasurementStatisticItemType.Deviation
         }
         return float(self.visa_ask(f"? {stat_measurement_type},{item},{source}"))
 
@@ -2413,29 +2416,60 @@ class Timebase(Rigol1000zCommandMenu):
         self.delay = TimebaseDelay(visa_resource)
 
     @property
-    def timebase_scale_s_div(self):
+    def scale(self):
+        """
+        Query the main timebase scale. The default unit is s/div.
+        :return:
+        """
         return float(self.visa_ask(':scal?'))
 
-    def timebase_scale_s_div(self, timebase):
-        assert 50e-9 <= timebase <= 50
-        self.visa_write(f':scal {timebase:.4e}')
+    @scale.setter
+    def scale(self, val: float):
+        """
+        Set the main timebase scale. The default unit is s/div.
+
+        :param val:
+        :return:
+        """
+        assert 50e-9 <= val <= 50
+        self.visa_write(f':scal {val:.4e}')
 
     @property
-    def timebase_mode(self) -> str:
+    def mode(self) -> str:
+        """
+        Query the mode of the horizontal timebase.
+
+        :return:
+        """
         return self.visa_ask(':mode?')
 
-    @timebase_mode.setter
-    def timebase_mode(self, val: str):
+    @mode.setter
+    def mode(self, val: str):
+        """
+        Set the mode of the horizontal timebase.
+
+        :param val:
+        :return:
+        """
         val = val.lower()
-        assert val in ('main', 'xy', 'roll')
+        assert val in {ETimebaseMode.Main, ETimebaseMode.XY, ETimebaseMode.Roll}
         self.visa_write(f':mode {val}')
 
     @property
-    def timebase_offset_s(self):
+    def offset(self):
+        """
+        Query the main timebase offset. The default unit is s.
+        :return:
+        """
         return self.visa_ask(':offs?')
 
-    @timebase_offset_s.setter
-    def timebase_offset_s(self, val):
+    @offset.setter
+    def offset(self, val):
+        """
+        Set the main timebase offset. The default unit is s.
+        :param val:
+        :return:
+        """
         self.visa_write(f':offs {-val:.4e}')
 
 
