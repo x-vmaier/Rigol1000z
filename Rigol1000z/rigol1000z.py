@@ -16,8 +16,10 @@ class Rigol1000z(Rigol1000zCommandMenu):
         # Instantiate The scope as a visa command menu
         super().__init__(visa_resource)
 
+
+
         # Initialize IEEE device identifier command in order to determine the model
-        brand, model, serial_number, software_version, *add_args = self.visa_resource.query("*IDN?").split(",")
+        brand, model, serial_number, software_version, *add_args = self._idn_cache.split(",")
 
         # Ensure a valid model is being used
         assert brand == "RIGOL TECHNOLOGIES"
@@ -49,11 +51,11 @@ class Rigol1000z(Rigol1000zCommandMenu):
         self.math = Math(self.visa_resource)  # NC
         self.mask = Mask(self.visa_resource)  # NC
 
-        self.measure = Measure(self.visa_resource)  # WIP (need to complete item, and statistic:item commands)
+        self.measure = Measure(self.visa_resource)
 
         self.reference = Reference(self.visa_resource)  # NC
 
-        if model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus}:  # Only for "S Plus" models
+        if model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus}:  # Only for "S" models
             self.source = Source(self.visa_resource)  # NC
 
         self.storage = Storage(self.visa_resource)  # NC

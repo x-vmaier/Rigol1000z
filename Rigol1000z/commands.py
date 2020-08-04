@@ -12,8 +12,8 @@ class Channel(Rigol1000zCommandMenu):
     Complete
     """
 
-    def __init__(self, visa_resource: _visa.Resource, channel: int):
-        super().__init__(visa_resource)
+    def __init__(self, visa_resource: _visa.Resource, channel: int, idn: str = None):
+        super().__init__(visa_resource, idn)
         self._channel = channel
 
         self.cmd_hierarchy_str = f":chan{self._channel}"
@@ -158,8 +158,8 @@ class Acquire(Rigol1000zCommandMenu):
     """
     cmd_hierarchy_str = ":acq"
 
-    def __init__(self, visa_resource: _visa.Resource, channels: List[Channel]):
-        super().__init__(visa_resource)
+    def __init__(self, visa_resource: _visa.Resource, channels: List[Channel], idn: str = None):
+        super().__init__(visa_resource, idn)
         self._linked_channels = channels
 
     @property
@@ -386,7 +386,7 @@ class EventTable(Rigol1000zCommandMenu):
         :return: Boolean state of the event table
         """
         # todo: query decoder<n>:display to ensure command is valid
-        return bool(self.visa_ask(':disp?'))
+        return bool(int(self.visa_ask(':disp?')))
 
     @enabled.setter
     def enabled(self, val: bool):
@@ -395,17 +395,16 @@ class EventTable(Rigol1000zCommandMenu):
         :param val: Boolean state to set the event table to
         :return:
         """
-        # todo: query decoder<n>:display to ensure command is valid
+
         self.visa_write(f':disp {1 if val else 0}')
 
     @property
-    def display_format(self) -> str:
-        # todo: query decoder<n>:display to ensure command is valid
-        return bool(self.visa_ask(':form?'))
+    def display_format(self) -> bool:
+        return bool(int(self.visa_ask(':form?')))
 
     @display_format.setter
     def display_format(self, val: str):
-        # todo: query decoder<n>:display to ensure command is valid
+
         assert val in {EEventtableFormat.Hex, EEventtableFormat.Ascii, EEventtableFormat.Decimal}
         self.visa_write(f':form {val}')
 
@@ -419,15 +418,15 @@ class EventTable(Rigol1000zCommandMenu):
         self.visa_write(f':view {val}')
 
     @property
-    def column(self) -> str:
+    def column(self) -> int:
         """
         Query the current column of the event table.
         :return:
         """
-        return self.visa_ask(':col?')
+        return int(self.visa_ask(':col?'))
 
     @column.setter
-    def column(self, val: str):
+    def column(self, val: int):
         """
         Set the current column of the event table.
 
@@ -447,8 +446,6 @@ class EventTable(Rigol1000zCommandMenu):
         :return:
         """
 
-        # todo: call decoder<>:mode in order to check if val is valid for decoder state
-        # assert val in {E}
         self.visa_write(f':col {val}')
 
     @property
@@ -834,9 +831,691 @@ class MeasureSetup(Rigol1000zCommandMenu):
         self.visa_write(f':dsb {val}')
 
 
-# incomplete
-class MeasureStatistic(Rigol1000zCommandMenu):
+class MeasurementStatisticItem(Rigol1000zCommandMenu):
+    """
+    Enable the statistic function of any waveform parameter of the specified source,
+    or query the statistic result of any waveform parameter of the specified source.
+
+    This class was written to simply the logic of this function as there are many rules.
+    All sources must be given when a query is called (no default args)
+    """
+    cmd_hierarchy_str = ":meas:stat:item"
+
+    def _statistic_item_write(self, item, source) -> None:
+        self.visa_write(f" {item},{source}")
+
+    def _statistic_item_query(self, stat_measurement_type, item, source) -> float:
+        """
+        Ensures that the statistic type is valid then builds and calls the visa query
+
+        :param stat_measurement_type:
+        :param item:
+        :param source:
+        :return:
+        """
+        assert stat_measurement_type in {
+            MeasurementStatisticItemType.Maximum, MeasurementStatisticItemType.Minimum,
+            MeasurementStatisticItemType.Current,
+            MeasurementStatisticItemType.Average,
+            MeasurementStatisticItemType.Deviation
+        }
+        return float(self.visa_ask(f"? {stat_measurement_type},{item},{source}"))
+
+    # region single source commands
+
+    # Voltage Maximum
+    def get_voltage_max(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageMax,
+            source
+        )
+
+    def set_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageMax,
+            source
+        )
+
+    # Voltage Minimum
+    def get_voltage_min(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageMin,
+            source
+        )
+
+    def set_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageMin,
+            source
+        )
+
+    # Voltage peak to peak
+    def get_voltage_peak_to_peak(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltagePeakToPeak,
+            source
+        )
+
+    def set_voltage_peak_to_peak(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltagePeakToPeak,
+            source
+        )
+
+    # Voltage Top
+    def get_voltage_top(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageTop,
+            source
+        )
+
+    def set_voltage_top(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageTop,
+            source
+        )
+
+    # Voltage Base
+    def get_voltage_base(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageBase,
+            source
+        )
+
+    def set_voltage_base(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageBase,
+            source
+        )
+
+    # Voltage Amplitude
+    def get_voltage_amp(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageAmplitude,
+            source
+        )
+
+    def set_voltage_amp(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageAmplitude,
+            source
+        )
+
+    # Voltage Average
+    def get_voltage_average(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageAverage,
+            source
+        )
+
+    def set_voltage_average(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageAverage,
+            source
+        )
+
+    # Voltage RMS
+    def get_voltage_rms(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageRMS,
+            source
+        )
+
+    def set_voltage_rms(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageRMS,
+            source
+        )
+
+    # Voltage Overshoot
+    def get_voltage_overshoot(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageOvershoot,
+            source
+        )
+
+    def set_voltage_overshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageOvershoot,
+            source
+        )
+
+    # Area
+    def get_area(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.Area,
+            source
+        )
+
+    def set_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.Area,
+            source
+        )
+
+    # Period Area
+    def get_period_area(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.AreaPeriod,
+            source
+        )
+
+    def set_period_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.AreaPeriod,
+            source
+        )
+
+    # Preshoot
+    def get_preshoot(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltagePreshoot,
+            source
+        )
+
+    def set_preshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltagePreshoot,
+            source
+        )
+
+    # period
+    def get_period(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.Period,
+            source
+        )
+
+    def set_period(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.Period,
+            source
+        )
+
+    # frequency
+    def get_frequency(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.Frequency,
+            source
+        )
+
+    def set_frequency(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.Frequency,
+            source
+        )
+
+    # rise time
+    def get_rise_time(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.RiseTime,
+            source
+        )
+
+    def set_rise_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.RiseTime,
+            source
+        )
+
+    # fall time
+    def get_fall_time(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.FallTime,
+            source
+        )
+
+    def set_fall_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.FallTime,
+            source
+        )
+
+    # width positive
+    def get_width_positive(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.WidthPositive,
+            source
+        )
+
+    def set_width_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.WidthPositive,
+            source
+        )
+
+    # width negative
+    def get_width_negative(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.WidthNegative,
+            source
+        )
+
+    def set_width_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.WidthNegative,
+            source
+        )
+
+    # duty positive
+    def get_duty_positive(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.DutyPositive,
+            source
+        )
+
+    def set_duty_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.DutyPositive,
+            source
+        )
+
+    # duty negative
+    def get_duty_negative(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.DutyNegative,
+            source
+        )
+
+    def set_duty_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.DutyNegative,
+            source
+        )
+
+    # time_voltage_max
+    def get_time_voltage_max(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.TVMax,
+            source
+        )
+
+    def set_time_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.TVMin,
+            source
+        )
+
+    # time_voltage_min
+    def get_time_voltage_min(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.TVMin,
+            source
+        )
+
+    def set_time_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.TVMin,
+            source
+        )
+
+    # Slew rate max
+    def get_slew_rate_positive(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.SlewRatePositive,
+            source
+        )
+
+    def set_slew_rate_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.SlewRatePositive,
+            source
+        )
+
+    # Slew rate min
+    def get_slew_rate_negative(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.SlewRateNegative,
+            source
+        )
+
+    def set_slew_rate_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.SlewRateNegative,
+            source
+        )
+
+    # Upper Voltage
+    def get_voltage_upper(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageUpper,
+            source
+        )
+
+    def set_voltage_upper(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageUpper,
+            source
+        )
+
+    # Middle Voltage
+    def get_voltage_mid(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageMid,
+            source
+        )
+
+    def set_voltage_mid(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageMid,
+            source
+        )
+
+    # Lower Voltage
+    def get_voltage_lower(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VoltageLower,
+            source
+        )
+
+    def set_voltage_lower(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VoltageLower,
+            source
+        )
+
+    # Variance
+    def get_variance(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.Variance,
+            source
+        )
+
+    def set_variance(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.Variance,
+            source
+        )
+
+    # Variance
+    def get_voltage_rms_period(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.VRmsPeriod,
+            source
+        )
+
+    def set_voltage_rms_period(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.VRmsPeriod,
+            source
+        )
+
+    # Pulses Positive
+    def get_pules_positive(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    def set_pules_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    # Pulses Negative
+    def get_pules_negative(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    def set_pules_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    # Edges Positive
+    def get_edges_positive(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.EdgesPositive,
+            source
+        )
+
+    def set_edges_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.EdgesPositive,
+            source
+        )
+
+    # Edges Negative
+    def get_edges_negative(self, source: str, stat_measurement_type: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.EdgesNegative,
+            source
+        )
+
+    def set_edges_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._statistic_item_write(
+            EMeasureItem.EdgesNegative,
+            source
+        )
+
+    # endregion
+
+    # region double source commands
+    # Rise Delay
+    def get_rise_delay(self, source_1: str, source_2: str, stat_measurement_type: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.DelayRise,
+            f"{source_1},{source_2}"
+        )
+
+    def set_rise_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_write(
+            EMeasureItem.DelayRise,
+            f"{source_1},{source_2}"
+        )
+
+    # Fall Delay
+    def get_fall_delay(self, source_1: str, source_2: str, stat_measurement_type: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.DelayFall,
+            f"{source_1},{source_2}"
+        )
+
+    def set_fall_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_write(
+            EMeasureItem.DelayFall,
+            f"{source_1},{source_2}"
+        )
+
+    # Rise Phase
+    def get_rise_phase(self, source_1: str, source_2: str, stat_measurement_type: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.PhaseRise,
+            f"{source_1},{source_2}"
+        )
+
+    def set_rise_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_write(
+            EMeasureItem.PhaseRise,
+            f"{source_1},{source_2}"
+        )
+
+    # Fall Phase
+    def get_fall_phase(self, source_1: str, source_2: str, stat_measurement_type: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_query(
+            stat_measurement_type,
+            EMeasureItem.PhaseFall,
+            f"{source_1},{source_2}"
+        )
+
+    def set_fall_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._statistic_item_write(
+            EMeasureItem.PhaseFall,
+            f"{source_1},{source_2}"
+        )
+
+    # endregion
+
+
+class MeasurementStatistic(Rigol1000zCommandMenu):
     cmd_hierarchy_str = ":meas:stat"
+
+    def __init__(self, visa_resource: _visa.Resource, idn: str):
+        super().__init__(visa_resource, idn)
+        self.item = MeasurementStatisticItem(visa_resource, idn)
 
     @property
     def enabled(self) -> bool:
@@ -898,11 +1577,642 @@ class MeasureStatistic(Rigol1000zCommandMenu):
         # todo: what the fuck is item (pg 145)
 
 
-class MeasureItem:
-    pass
+class MeasurementItem(Rigol1000zCommandMenu):
+    """
+    Measure any waveform parameter of the specified source,
+    or query the measurement result of any waveform parameter of the specified source.
+
+    This class was written to simply the logic of this function as there are many rules.
+    All sources must be given when a query is called (no default args)
+    """
+    cmd_hierarchy_str = ":meas:item"
+
+    def _item_write(self, item, source) -> None:
+        self.visa_write(f" {item},{source}")
+
+    def _item_query(self, item, source) -> float:
+        """
+        Ensures that the statistic type is valid then builds and calls the visa query
+
+        :param item:
+        :param source:
+        :return:
+        """
+
+        return float(self.visa_ask(f"? {item},{source}"))
+
+    # region single source commands
+
+    # Voltage Maximum
+    def get_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageMax,
+            source
+        )
+
+    def set_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageMax,
+            source
+        )
+
+    # Voltage Minimum
+    def get_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageMin,
+            source
+        )
+
+    def set_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageMin,
+            source
+        )
+
+    # Voltage peak to peak
+    def get_voltage_peak_to_peak(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltagePeakToPeak,
+            source
+        )
+
+    def set_voltage_peak_to_peak(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltagePeakToPeak,
+            source
+        )
+
+    # Voltage Top
+    def get_voltage_top(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageTop,
+            source
+        )
+
+    def set_voltage_top(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageTop,
+            source
+        )
+
+    # Voltage Base
+    def get_voltage_base(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageBase,
+            source
+        )
+
+    def set_voltage_base(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageBase,
+            source
+        )
+
+    # Voltage Amplitude
+    def get_voltage_amp(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageAmplitude,
+            source
+        )
+
+    def set_voltage_amp(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageAmplitude,
+            source
+        )
+
+    # Voltage Average
+    def get_voltage_average(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageAverage,
+            source
+        )
+
+    def set_voltage_average(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageAverage,
+            source
+        )
+
+    # Voltage RMS
+    def get_voltage_rms(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageRMS,
+            source
+        )
+
+    def set_voltage_rms(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageRMS,
+            source
+        )
+
+    # Voltage Overshoot
+    def get_voltage_overshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageOvershoot,
+            source
+        )
+
+    def set_voltage_overshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageOvershoot,
+            source
+        )
+
+    # Area
+    def get_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.Area,
+            source
+        )
+
+    def set_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.Area,
+            source
+        )
+
+    # Period Area
+    def get_period_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.AreaPeriod,
+            source
+        )
+
+    def set_period_area(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.AreaPeriod,
+            source
+        )
+
+    # Preshoot
+    def get_preshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltagePreshoot,
+            source
+        )
+
+    def set_preshoot(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltagePreshoot,
+            source
+        )
+
+    # period
+    def get_period(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.Period,
+            source
+        )
+
+    def set_period(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.Period,
+            source
+        )
+
+    # frequency
+    def get_frequency(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.Frequency,
+            source
+        )
+
+    def set_frequency(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.Frequency,
+            source
+        )
+
+    # rise time
+    def get_rise_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.RiseTime,
+            source
+        )
+
+    def set_rise_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.RiseTime,
+            source
+        )
+
+    # fall time
+    def get_fall_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.FallTime,
+            source
+        )
+
+    def set_fall_time(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.FallTime,
+            source
+        )
+
+    # width positive
+    def get_width_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.WidthPositive,
+            source
+        )
+
+    def set_width_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.WidthPositive,
+            source
+        )
+
+    # width negative
+    def get_width_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.WidthNegative,
+            source
+        )
+
+    def set_width_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.WidthNegative,
+            source
+        )
+
+    # duty positive
+    def get_duty_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.DutyPositive,
+            source
+        )
+
+    def set_duty_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.DutyPositive,
+            source
+        )
+
+    # duty negative
+    def get_duty_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.DutyNegative,
+            source
+        )
+
+    def set_duty_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.DutyNegative,
+            source
+        )
+
+    # time_voltage_max
+    def get_time_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.TVMax,
+            source
+        )
+
+    def set_time_voltage_max(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.TVMin,
+            source
+        )
+
+    # time_voltage_min
+    def get_time_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.TVMin,
+            source
+        )
+
+    def set_time_voltage_min(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.TVMin,
+            source
+        )
+
+    # Slew rate max
+    def get_slew_rate_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.SlewRatePositive,
+            source
+        )
+
+    def set_slew_rate_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.SlewRatePositive,
+            source
+        )
+
+    # Slew rate min
+    def get_slew_rate_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.SlewRateNegative,
+            source
+        )
+
+    def set_slew_rate_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.SlewRateNegative,
+            source
+        )
+
+    # Upper Voltage
+    def get_voltage_upper(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageUpper,
+            source
+        )
+
+    def set_voltage_upper(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageUpper,
+            source
+        )
+
+    # Middle Voltage
+    def get_voltage_mid(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageMid,
+            source
+        )
+
+    def set_voltage_mid(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageMid,
+            source
+        )
+
+    # Lower Voltage
+    def get_voltage_lower(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VoltageLower,
+            source
+        )
+
+    def set_voltage_lower(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VoltageLower,
+            source
+        )
+
+    # Variance
+    def get_variance(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.Variance,
+            source
+        )
+
+    def set_variance(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.Variance,
+            source
+        )
+
+    # Variance
+    def get_voltage_rms_period(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.VRmsPeriod,
+            source
+        )
+
+    def set_voltage_rms_period(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.VRmsPeriod,
+            source
+        )
+
+    # Pulses Positive
+    def get_pules_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    def set_pules_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    # Pulses Negative
+    def get_pules_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    def set_pules_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.PulsesPositive,
+            source
+        )
+
+    # Edges Positive
+    def get_edges_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.EdgesPositive,
+            source
+        )
+
+    def set_edges_positive(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.EdgesPositive,
+            source
+        )
+
+    # Edges Negative
+    def get_edges_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.EdgesNegative,
+            source
+        )
+
+    def set_edges_negative(self, source: str):
+        assert self.source_valid(source, digital_valid=False, ch_valid=True, math_valid=True)
+        self._item_write(
+            EMeasureItem.EdgesNegative,
+            source
+        )
+
+    # endregion
+
+    # region double source commands
+    # Rise Delay
+    def get_rise_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.DelayRise,
+            f"{source_1},{source_2}"
+        )
+
+    def set_rise_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_write(
+            EMeasureItem.DelayRise,
+            f"{source_1},{source_2}"
+        )
+
+    # Fall Delay
+    def get_fall_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.DelayFall,
+            f"{source_1},{source_2}"
+        )
+
+    def set_fall_delay(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_write(
+            EMeasureItem.DelayFall,
+            f"{source_1},{source_2}"
+        )
+
+    # Rise Phase
+    def get_rise_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.PhaseRise,
+            f"{source_1},{source_2}"
+        )
+
+    def set_rise_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_write(
+            EMeasureItem.PhaseRise,
+            f"{source_1},{source_2}"
+        )
+
+    # Fall Phase
+    def get_fall_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_query(
+            EMeasureItem.PhaseFall,
+            f"{source_1},{source_2}"
+        )
+
+    def set_fall_phase(self, source_1: str, source_2: str):
+        assert self.source_valid(source_1, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+        assert self.source_valid(source_2, digital_valid=self.has_digital, ch_valid=True, math_valid=True)
+
+        self._item_write(
+            EMeasureItem.PhaseFall,
+            f"{source_1},{source_2}"
+        )
+
+    # endregion
 
 
-# incomplete
 class Measure(Rigol1000zCommandMenu):
     """
     DS1000Z supports the auto measurement of the following 37 waveform parameters and provides the
@@ -914,12 +2224,13 @@ class Measure(Rigol1000zCommandMenu):
     """
     cmd_hierarchy_str = ":meas"
 
-    def __init__(self, visa_resource: _visa.Resource):
-        super().__init__(visa_resource)
+    def __init__(self, visa_resource: _visa.Resource, idn: str = None):
+        super().__init__(visa_resource, idn)
 
-        self.counter = MeasureCounter(visa_resource)
-        self.setup = MeasureSetup(visa_resource)
-        self.statistic = MeasureStatistic(visa_resource)
+        self.counter = MeasureCounter(visa_resource, idn)
+        self.setup = MeasureSetup(visa_resource, idn)
+        self.statistic = MeasurementStatistic(visa_resource, idn)
+        self.item = MeasurementItem(visa_resource, idn)
 
     @property
     def source(self) -> str:
@@ -1023,79 +2334,6 @@ class Measure(Rigol1000zCommandMenu):
         :return:
         """
         self.visa_write(f':ams {",".join(val)}')
-
-    def item(self, measurement_item: str, source_1: str, source_2: Union[None, str] = None):
-        """
-        Measure any waveform parameter of the specified source, or query the measurement
-        result of any waveform parameter of the specified source.
-
-        :param measurement_item:
-        :param source_1:
-        :param source_2:
-        :return:
-        """
-
-        # Check the sources are valid given the model
-        if self.has_digital:
-            assert source_1 in {*sources_analog, *sources_digital, *sources_math}
-            if source_2 is not None:
-                assert source_2 in {*sources_analog, *sources_digital, *sources_math}
-        else:
-            assert source_1 in {*sources_analog, *sources_math}
-            if source_2 is not None:
-                assert source_2 in {*sources_analog, *sources_math}
-
-        # Ensure sources are valid given the measurement type
-        if measurement_item in {
-            EMeasureItem.Period, EMeasureItem.Frequency, EMeasureItem.WidthPositive,
-            EMeasureItem.WidthNegative,
-            EMeasureItem.DutyPositive, EMeasureItem.DutyNegative, EMeasureItem.DelayRise,
-            EMeasureItem.DelayFall,
-            EMeasureItem.PhaseRise, EMeasureItem.PhaseFall
-        }:
-            # Sources can be any source given the measurement item
-            assert source_1 in {*sources_analog, *sources_digital, *sources_math}
-            if source_2 is not None:
-                assert source_2 in {*sources_analog, *sources_digital, *sources_math}
-
-        else:
-            # Sources can only be a channel or math
-            assert source_1 in {*sources_analog, *sources_math}
-            if source_2 is not None:
-                assert source_2 in {*sources_analog, *sources_math}
-
-        # Ensure that the correct number of channels are passed given the command
-        assert source_1 is not None
-
-        # Single source commands
-        if measurement_item in {
-            EMeasureItem.VoltageMax, EMeasureItem.VoltageMin,
-            EMeasureItem.VoltagePeakToPeak,
-            EMeasureItem.VoltageTop, EMeasureItem.VoltageBase,
-            EMeasureItem.VoltageAmplitude, EMeasureItem.VoltageAverage,
-            EMeasureItem.VoltageRMS, EMeasureItem.VRmsPeriod,
-            EMeasureItem.VoltageOvershoot, EMeasureItem.VoltagePreshoot,
-            EMeasureItem.Area, EMeasureItem.AreaPeriod,
-            EMeasureItem.Period, EMeasureItem.Frequency,
-            EMeasureItem.RiseTime, EMeasureItem.FallTime,
-            EMeasureItem.WidthPositive, EMeasureItem.WidthNegative,
-            EMeasureItem.DutyPositive, EMeasureItem.DutyNegative,
-            EMeasureItem.TVMax, EMeasureItem.TVMin,
-            EMeasureItem.SlewRatePositive, EMeasureItem.SlewRateNegative,
-            EMeasureItem.VoltageUpper, EMeasureItem.VoltageMid, EMeasureItem.VoltageLower,
-            EMeasureItem.Variance,
-            EMeasureItem.PulsesPositive, EMeasureItem.PulsesNegative,
-            EMeasureItem.EdgesPositive, EMeasureItem.EdgesNegative
-        }:
-            assert source_2 is None
-
-        # Double source commands
-        elif measurement_item in {
-            EMeasureItem.DelayRise, EMeasureItem.DelayFall, EMeasureItem.PhaseRise, EMeasureItem.PhaseFall
-        }:
-            assert source_2 is not None
-
-        # todo: implement both read and write... wtf
 
 
 # incomplete
@@ -1234,7 +2472,7 @@ class Trigger(Rigol1000zCommandMenu):
 
 class PreambleContext:
     """
-    Proper storage class for preamble data
+    Proper storage class for waveform preamble data
     """
 
     def __init__(self, preamble_str):

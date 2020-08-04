@@ -35,10 +35,19 @@ class Rigol1000zCommandMenu(CommandMenu):
     Adds additional checks and features exclusive to the Rigol1000z series of scopes
     """
 
+    def __init__(self, visa_resource, idn: str = None):
+        super().__init__(visa_resource)
+
+        if (idn is not None) and (type(idn) is str):
+            self._idn_cache: str = idn
+
+        else:
+            # Cache the device's identifier
+            self._idn_cache: str = self.visa_resource.query("*IDN?")
+
     @property
     def osc_model(self) -> str:
-        idn: str = self.visa_resource.query("*IDN?")
-        brand, model, serial_number, software_version, *add_args = idn.split(",")
+        brand, model, serial_number, software_version, *additional_args = self._idn_cache.split(",")
         return model
 
     @property
@@ -52,6 +61,18 @@ class Rigol1000zCommandMenu(CommandMenu):
         return self.osc_model in {
             ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1074Z_S_Plus,
             ScopeModel.DS1104Z_Plus, ScopeModel.DS1074Z_Plus}
+
+    @staticmethod
+    def source_valid(source: str, digital_valid: bool, ch_valid: bool, math_valid: bool) -> bool:
+        if digital_valid and source in sources_digital:
+            return True
+        elif ch_valid and source in sources_analog:
+            return True
+        elif math_valid and source in sources_math:
+            return True
+
+        # If source any other value
+        return False
 
     def get_rated_frequency(self) -> float:
         osc_model = self.osc_model

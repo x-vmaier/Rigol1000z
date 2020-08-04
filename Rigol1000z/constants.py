@@ -56,7 +56,6 @@ class EMeasureStatisticMode:
 
 
 class EMeasureItem:
-
     VoltageMax = "VMAX"
     VoltageMin = "VMIN"
     VoltagePeakToPeak = "VPP"
@@ -109,6 +108,14 @@ class EMeasureItem:
     PulsesNegative = "NPUL"
     EdgesPositive = "PEDG"
     EdgesNegative = "NEDG"
+
+
+class MeasurementStatisticItemType:
+    Maximum = "MAX"
+    Minimum = "MIN"
+    Current = "CURR"
+    Average = "AVER"
+    Deviation = "DEV"
 
 
 class ESource:
