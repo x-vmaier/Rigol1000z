@@ -1,15 +1,18 @@
-import os
+"""
+This module contains the definition for the high-level Rigol1000z driver.
+"""
+
 import numpy as _np
 import tqdm as _tqdm
 import pyvisa as _visa
-from Rigol1000z.rigol1000zcommandmenu import Rigol1000zCommandMenu
 from time import sleep
 from Rigol1000z.commands import *
+from typing import List
 
 
 class Rigol1000z(Rigol1000zCommandMenu):
     """
-    Rigol DS1000z series oscilloscope driver.
+    The Rigol DS1000z series oscilloscope driver.
     """
 
     def __init__(self, visa_resource: _visa.Resource):
@@ -28,21 +31,41 @@ class Rigol1000z(Rigol1000zCommandMenu):
         }
 
         # Define Channels 1-4
-        self.channel_list = [Channel(self.visa_resource, c) for c in range(1, 5)]
+        self.channel_list: List[Channel] = [Channel(self.visa_resource, c) for c in range(1, 5)]
+        """
+        A four-item list of commands.Channel objects
+        """
 
         # acquire must be able to count enabled channels
         self.acquire = Acquire(self.visa_resource, self.channel_list)
+        """
+        Hierarchy commands.Acquire object
+        """
+
         self.calibrate = Calibrate(self.visa_resource)
+        """
+        Hierarchy commands.Calibrate object
+        """
 
         self.cursor = Cursor(self.visa_resource)  # NC
         self.decoder = Decoder(self.visa_resource)  # NC
 
         self.display = Display(self.visa_resource)
+        """
+        Hierarchy commands.Display object
+        """
+
         self.event_tables = [EventTable(self.visa_resource, et + 1) for et in range(2)]
+        """
+        A two-item list of commands.EventTable objects used to detect decode events.
+        """
 
         self.function = Function(self.visa_resource)  # NC
 
         self.ieee488 = IEEE488(self.visa_resource)
+        """
+        Hierarchy commands.IEEE488 object
+        """
 
         if self.has_digital:
             self.la = LA(self.visa_resource)  # NC
@@ -51,6 +74,9 @@ class Rigol1000z(Rigol1000zCommandMenu):
         self.mask = Mask(self.visa_resource)  # NC
 
         self.measure = Measure(self.visa_resource)
+        """
+        Hierarchy commands.Measure object
+        """
 
         self.reference = Reference(self.visa_resource)  # NC
 
@@ -60,10 +86,18 @@ class Rigol1000z(Rigol1000zCommandMenu):
         self.storage = Storage(self.visa_resource)  # NC
         self.system = System(self.visa_resource)  # NC
         self.trace = Trace(self.visa_resource)  # NC
+
         self.timebase = Timebase(self.visa_resource)
+        """
+        Hierarchy commands.Timebase object
+        """
+
         self.trigger = Trigger(self.visa_resource)  # NC
 
         self.waveform = Waveform(self.visa_resource)
+        """
+        Hierarchy commands.Waveform object
+        """
 
     def __enter__(self):
         return self

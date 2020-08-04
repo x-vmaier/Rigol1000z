@@ -1,3 +1,7 @@
+"""
+This module contains definitions for command menus of the Rigol1000z series of oscilloscopes.
+"""
+
 import os
 import numpy as _np
 import tqdm as _tqdm

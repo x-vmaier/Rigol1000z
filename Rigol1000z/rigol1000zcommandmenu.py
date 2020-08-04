@@ -1,3 +1,7 @@
+"""
+This module contains menu hierarchy abstractions.
+"""
+
 import pyvisa as _visa
 from Rigol1000z.constants import *
 
@@ -9,23 +13,26 @@ class CommandMenu:
     """
 
     cmd_hierarchy_str: str = ""
+    """
+    The menu hierarchy to call commands from
+    """
 
     def __init__(self, visa_resource: _visa.Resource):
         self.visa_resource: _visa.Resource = visa_resource
 
-    def visa_write(self, cmd):
+    def visa_write(self, cmd: str):
         self.visa_resource.write(self.cmd_hierarchy_str + cmd)
 
-    def visa_read(self):
+    def visa_read(self) -> str:
         return self.visa_resource.read().strip()
 
-    def visa_read_raw(self, num_bytes=-1):
+    def visa_read_raw(self, num_bytes: int = -1):
         return self.visa_resource.read_raw(num_bytes)
 
-    def visa_ask(self, cmd):
+    def visa_ask(self, cmd: str):
         return self.visa_resource.query(self.cmd_hierarchy_str + cmd)
 
-    def visa_ask_raw(self, cmd, num_bytes=-1):
+    def visa_ask_raw(self, cmd: str, num_bytes: int = -1):
         self.visa_write(self.cmd_hierarchy_str + cmd)
         return self.visa_read_raw(num_bytes)
 
@@ -53,9 +60,12 @@ class Rigol1000zCommandMenu(CommandMenu):
     @property
     def has_digital(self) -> bool:
         """
-        Return whether the model has digital channels
+        Does the model have digital channels
 
-        :return:
+        Returns
+        -------
+        bool
+            Does the scope have digital channel support
         """
         # Plus models supports digital channels
         return self.osc_model in {
@@ -64,6 +74,25 @@ class Rigol1000zCommandMenu(CommandMenu):
 
     @staticmethod
     def source_valid(source: str, digital_valid: bool, ch_valid: bool, math_valid: bool) -> bool:
+        """
+        Given the source string and what channels are valid returns if the source is valid
+
+        Parameters
+        ----------
+        source: str
+            The source string to check
+        digital_valid: bool
+            Is a digital source valid
+        ch_valid: bool
+            Is a channel source valid
+        math_valid: bool
+            Is a math source valid
+
+        Returns
+        -------
+        bool
+            A boolean indicating if the source is valid
+        """
         if digital_valid and source in sources_digital:
             return True
         elif ch_valid and source in sources_analog:
@@ -74,7 +103,16 @@ class Rigol1000zCommandMenu(CommandMenu):
         # If source any other value
         return False
 
-    def get_rated_frequency(self) -> float:
+    @property
+    def rated_frequency(self) -> float:
+        """
+        Get the rated frequency from the oscilloscope model
+
+        Returns
+        -------
+        float
+            The rated frequency(Hz) of the model
+        """
         osc_model = self.osc_model
 
         if osc_model in {ScopeModel.DS1104Z_S_Plus, ScopeModel.DS1104Z_Plus}:

@@ -24,8 +24,9 @@ $ pipenv install
 ## Example
 ```python
 import pyvisa as visa
-import Rigol1000z
-from Rigol1000z.constants import EWaveformMode
+from Rigol1000z import Rigol1000z
+from time import sleep
+from Rigol1000z.constants import *
 
 # Initialize the visa resource manager
 rm = visa.ResourceManager()
@@ -33,33 +34,31 @@ rm = visa.ResourceManager()
 # Get the first visa device connected
 osc_resource = rm.open_resource(rm.list_resources()[0])
 
-# Create
-with Rigol1000z.Rigol1000z(osc_resource) as osc:
-    # start with known state by restoring default settings
-    osc.ieee488.reset()
+# Create oscilloscope interface using with statement!
+with Rigol1000z(osc_resource) as osc:
+    osc.ieee488.reset()  # start with known state by restoring default settings
 
-    # run data acquisition
-    osc.run()
+    # osc.autoscale()  # Autoscale the scope
 
-    # Change voltage range of channel 1 to 50mV/div.
-    osc[1].scale_v = 50e-3
+    # Set the horizontal timebase
+    osc.timebase.mode = ETimebaseMode.Main  # Set the timebase mode to main (normal operation)
+    osc.timebase.scale = 10 * 10 ** -6  # Set the timebase scale
 
-    # Autoscale the scope
-    osc.autoscale()
+    # Go through each channel
+    for i in range(1, 5):
+        osc[i].enabled = True  # Enable the channel
+        osc[i].scale_v = 1000e-3  # Change voltage range of the channel to 1.0V/div.
 
-    # Stop the scope in order to collect data.
-    osc.stop()
+    osc.run()  # Run the scope if not already
+    sleep(0.5)  # Let scope collect the waveform
 
-    # Take a screenshot of the scope's display
-    osc.get_screenshot('screenshot.png', 'png')
+    osc.stop()  # Stop the scope in order to collect data.
 
-    # todo: collect data from all enabled channels of the scope
-    osc.get_data(EWaveformMode.Raw, './channel1.csv')
+    osc.get_screenshot('./screenshot.png')  # Take a screenshot of the scope's display
 
-    # Move back to run mode when data collection is complete
-    osc.run()
+    osc.get_data(EWaveformMode.Raw, './channels.csv')  # Collect and save waveform data from all enabled channels
 
-print("done")
+    osc.run()  # Move back to run mode when data collection is complete
 ```
 
 ## Acknowledgements
@@ -72,3 +71,15 @@ My goal for the rewrite has been to make the device as easy as possible to contr
 * Developing a command hierarchy as it is found in the Rigol programming manual and adding docstrings describing the effect of the function.
 * Implementing most set/get commands as properties and related setters for a more organic device interface.
 * Defining discrete string constants separately so that autocompletion of constants can be preformed from the corresponding enumeration class
+
+## Feedback/Contributing
+I began this project to create the best library to control the Rigol1000z series of scopes.
+This is a huge project and I suspect there will be issues with some commands.
+
+If any issues are discovered, please submit an issue to the [issues page](https://github.com/AlexZettler/Rigol1000z/issues)
+with the oscilloscope model you are using, and code you were running. 
+
+Feedback will keep this project growing and I encourage all suggestions.
+
+## Contributing
+There are menus that aren't yet implemented completely. If you would like to implement one of these menus or fixing an issue that you have been having, feel free to submit a pull request.

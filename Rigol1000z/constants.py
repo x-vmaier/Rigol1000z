@@ -1,5 +1,5 @@
 """
-This module contains definitions for discrete string constants used in communication with Rigol100z series oscilloscopes
+This module contains definitions for string constants used to communicate with Rigol100z series oscilloscopes.
 """
 
 

@@ -8,6 +8,7 @@ tqdm = "*"
 numpy = "*"
 pyvisa = "*"
 pyvisa-py = "*"
+"pdoc3" = "*"
 
 [dev-packages]
 
